@@ -89,6 +89,8 @@ class VideoInpainter:
       self.logger.error("Could not create output video file")
       return None
 
+    # self.loadModel(model)
+
     with tqdm(total=total_frames) as pbar:
       while cap.isOpened():
         ret, frame = cap.read()
@@ -96,34 +98,24 @@ class VideoInpainter:
           self.logger.info("End of video reached")
           break
 
-        mask = self.create_mask(frame, mask_mode)
+        mask = self.create_mask(frame)
 
-        self.loadModel(model)
+        # match model:
+        #   case ModelEnum.LAMA.value:
+        #     inpainted = self.lama.process(frame, mask)
 
-        match model:
-          case ModelEnum.LAMA.value:
-            inpainted = self.lama.process(frame, mask)
+        #   case ModelEnum.OPENCV.value:
 
-          case ModelEnum.OPENCV.value:
+        #     if enableFTransform:
+        #       # MULTI_STEP and ITERATIVE will be taking forever for high resolution
+        #       inpainted = cv2.ft.inpaint(
+        #           frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
+        #     else:
+        #       inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
 
-            def processFrame_OpenCV(enableFTransform, frame, mask, out):
-              if enableFTransform:
-                # MULTI_STEP and ITERATIVE will be taking forever for high resolution
-                inpainted = cv2.ft.inpaint(
-                    frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
-              else:
-                inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
+        inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
 
-              out.write(inpainted)
-
-            with Pool(8) as pool:
-              for idx in range(100):
-                pool.apply_async(
-                    processFrame_OpenCV,
-                    (enableFTransform, frame, mask, out)
-                )
-              pool.close()
-              pool.join()
+        out.write(inpainted)
 
         pbar.update(1)
 
