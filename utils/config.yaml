@@ -1,0 +1,6 @@
+# config.yaml
+
+models:
+  LAMA:
+    ckpt: "./models/lama/big-lama.pth"
+    config: "./models/lama/config.yaml"

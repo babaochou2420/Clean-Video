@@ -7,7 +7,7 @@ from tqdm import tqdm
 import subprocess
 from datetime import timedelta
 from video_inpainter import VideoInpainter
-from screens.home_tab import create_home_tab
+from screens.HomeTab import HomeTab
 from screens.settings_tab import create_settings_tab
 from screens.about_tab import create_about_tab
 from utils.logger import setup_logger, log_function
@@ -113,7 +113,7 @@ def create_app():
   with gr.Blocks() as demo:
       # Create tabs
     logger.debug("Creating tabs")
-    home_tab = create_home_tab()
+    HomeTab.__load__()
     settings_tab = create_settings_tab()
     about_tab = create_about_tab()
     logger.info("Interface created successfully")

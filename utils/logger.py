@@ -10,7 +10,7 @@ os.makedirs("logs", exist_ok=True)
 def setup_logger(name):
   """Setup a logger with file and console handlers"""
   logger = logging.getLogger(name)
-  logger.setLevel(logging.DEBUG)
+  logger.setLevel(logging.INFO)
 
   # Create handlers
   log_file = os.path.join(

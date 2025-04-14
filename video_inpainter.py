@@ -1,4 +1,5 @@
 from enum import Enum
+from multiprocessing import Pool
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -14,9 +15,12 @@ import subprocess
 from utils.logger import setup_logger, log_function
 from tqdm import tqdm
 
+from daos.enums.ModelEnum import ModelEnum
 
+from utils.config import Config
 from daos.text_detector import TextDetector
 
+config = Config.get_config()
 
 # Setup logger
 logger = setup_logger('video_inpainter')
@@ -40,7 +44,7 @@ class VideoInpainter:
     self.text_detector = TextDetector()
 
   @log_function(logger)
-  def create_mask(self, frame: np.ndarray, height_percent: float = 0.2, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
+  def create_mask(self, frame: np.ndarray, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
     """Create a mask depending on the selected mode"""
     self.logger.debug(f"Creating mask with mode: {mask_mode}")
 
@@ -61,12 +65,10 @@ class VideoInpainter:
     #   self.logger.debug("Fallback bottom strip mask created")
 
   @log_function(logger)
-  def process_video(self, video_path: str, output_path: str, height_percent: float = 0.2, mask_mode: MaskMode = MaskMode.TEXT, progress: Optional[gr.Progress] = None) -> Optional[str]:
+  def process_video(self, video_path: str, output_path: str, model, enableFTransform: bool = False, mask_mode: MaskMode = MaskMode.TEXT) -> Optional[str]:
     """Process the video and apply inpainting on detected text regions"""
-    self.logger.info(f"Starting video processing: {video_path}")
-    self.logger.debug(f"Output path: {output_path}")
-    self.logger.debug(
-        f"Height percent: {height_percent}, Mask mode: {mask_mode}")
+    self.logger.info(
+        f"Start video processing with [{model}] on mask mode: {mask_mode}")
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -79,7 +81,7 @@ class VideoInpainter:
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     self.logger.info(
-        f"Video info: {width}x{height} @ {fps}fps, {total_frames} frames")
+        f"{width}x{height} @ {fps}fps | {total_frames} frames")
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -87,7 +89,6 @@ class VideoInpainter:
       self.logger.error("Could not create output video file")
       return None
 
-    frame_count = 0
     with tqdm(total=total_frames) as pbar:
       while cap.isOpened():
         ret, frame = cap.read()
@@ -95,10 +96,34 @@ class VideoInpainter:
           self.logger.info("End of video reached")
           break
 
-        mask = self.create_mask(frame)
+        mask = self.create_mask(frame, mask_mode)
 
-        inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
-        out.write(inpainted)
+        self.loadModel(model)
+
+        match model:
+          case ModelEnum.LAMA.value:
+            inpainted = self.lama.process(frame, mask)
+
+          case ModelEnum.OPENCV.value:
+
+            def processFrame_OpenCV(enableFTransform, frame, mask, out):
+              if enableFTransform:
+                # MULTI_STEP and ITERATIVE will be taking forever for high resolution
+                inpainted = cv2.ft.inpaint(
+                    frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
+              else:
+                inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
+
+              out.write(inpainted)
+
+            with Pool(8) as pool:
+              for idx in range(100):
+                pool.apply_async(
+                    processFrame_OpenCV,
+                    (enableFTransform, frame, mask, out)
+                )
+              pool.close()
+              pool.join()
 
         pbar.update(1)
 
@@ -107,6 +132,15 @@ class VideoInpainter:
     out.release()
 
     self.logger.info(f"Processing complete. Output saved to: {output_path}")
-    self.logger.info(f"Total frames processed: {frame_count}")
 
     return output_path
+
+  def loadModel(self, model: str):
+    if model == ModelEnum.LAMA.value:
+      from daos.models.LAMA import LAMA
+
+      self.lama = LAMA(config["models"]["LAMA"]["ckpt"],
+                       config["models"]["LAMA"]["config"], device="CUDA")
+    # elif model == "STTN":
+    #   from daos.models.STTN import STTN
+    #   return STTN()
