@@ -10,13 +10,20 @@ from video_inpainter import VideoInpainter
 from screens.home_tab import create_home_tab
 from screens.settings_tab import create_settings_tab
 from screens.about_tab import create_about_tab
+from utils.logger import setup_logger, log_function
+from typing import Optional, Tuple, Union
+
+# Setup logger
+logger = setup_logger('app')
 
 
 class VideoProcessor:
   def __init__(self):
+    self.logger = logger
     self.temp_dir = "temp"
     os.makedirs(self.temp_dir, exist_ok=True)
     self.inpainter = VideoInpainter()
+    self.logger.info("VideoProcessor initialized")
 
   def extract_frames(self, video_path, frame_rate, progress=gr.Progress()):
     """Extract frames from video at specified frame rate"""
@@ -50,51 +57,72 @@ class VideoProcessor:
     cap.release()
     return frames, frame_indices, fps
 
-  def process_video(self, video_path, progress=gr.Progress()):
+  @log_function(logger)
+  def process_video(self, video_path: str, height_percent: Union[float, str], progress: Optional[gr.Progress] = None) -> Tuple[Optional[str], str]:
     """Main video processing pipeline"""
     try:
-      # Process video with ProPainter
-      output_path = "output_video.mp4"
-      result = self.inpainter.process_video(video_path, output_path, progress)
+      # Convert height_percent to float if it's a string
+      if isinstance(height_percent, str):
+        try:
+          height_percent = float(height_percent)
+        except ValueError:
+          self.logger.error(f"Invalid height_percent value: {height_percent}")
+          return None, f"Error: Invalid height percentage value: {height_percent}"
 
-      # Copy audio from original to processed video
-      temp_video = "temp_video.mp4"
-      cmd = [
-          'ffmpeg', '-i', result,
-          '-i', video_path,
-          '-c:v', 'copy',
-          '-c:a', 'aac',
-          '-map', '0:v:0',
-          '-map', '1:a:0',
-          output_path
-      ]
-      subprocess.run(cmd)
-      os.remove(temp_video)
+      self.logger.info(f"Starting video processing: {video_path}")
+      self.logger.debug(f"Height percent: {height_percent}")
 
-      return output_path
+      # Create output directory if it doesn't exist
+      os.makedirs("output", exist_ok=True)
+      self.logger.debug("Output directory created/verified")
+
+      # Generate output path
+      output_path = os.path.join("output", "processed_video.mp4")
+      self.logger.debug(f"Output path: {output_path}")
+
+      # Process video
+      self.logger.info("Starting video inpainting")
+      result = self.inpainter.process_video(
+          video_path, output_path, height_percent, progress)
+
+      if result is None:
+        self.logger.error("Video processing failed")
+        return None, "Error processing video. Check debug logs for details."
+
+      self.logger.info("Video processing completed successfully")
+      return result, "Processing completed successfully"
+
     except Exception as e:
-      return str(e)
+      self.logger.error(
+          f"Error during video processing: {str(e)}", exc_info=True)
+      return None, f"Error: {str(e)}"
 
 
-def process_video_interface(video_path, progress=gr.Progress()):
+def process_video_interface(video_path, height_percent, progress=gr.Progress()):
   processor = VideoProcessor()
   try:
-    output_path = processor.process_video(video_path)
+    output_path = processor.process_video(video_path, height_percent)
     return output_path
   except Exception as e:
     return str(e)
 
 
+@log_function(logger)
 def create_app():
+  logger.info("Creating Gradio interface")
   with gr.Blocks() as demo:
       # Create tabs
+    logger.debug("Creating tabs")
     home_tab = create_home_tab()
     settings_tab = create_settings_tab()
     about_tab = create_about_tab()
+    logger.info("Interface created successfully")
 
   return demo
 
 
 if __name__ == "__main__":
+  logger.info("Starting application")
   demo = create_app()
+  logger.info("Launching Gradio interface")
   demo.launch()

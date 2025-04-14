@@ -16,11 +16,12 @@ def create_home_tab():
       with gr.Column():
         output_video = gr.Video(label="Processed Video")
 
-    def process_video(video_path, progress=gr.Progress()):
+    def process_video(video_path, progress=gr.Progress(track_tqdm=True)):
       try:
         inpainter = VideoInpainter()
         output_path = "output_video.mp4"
-        result = inpainter.process_video(video_path, output_path, progress)
+        result = inpainter.process_video(
+            video_path, output_path, 0.2, progress=progress)
         return result
       except Exception as e:
         return str(e)
