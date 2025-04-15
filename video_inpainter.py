@@ -19,7 +19,7 @@ from tqdm import tqdm
 from daos.enums.ModelEnum import ModelEnum
 
 from utils.config import Config
-from daos.text_detector import TextDetector
+from daos.TextDetector import TextDetector
 
 config = Config.get_config()
 
@@ -44,13 +44,15 @@ class VideoInpainter:
     self.logger.info("VideoInpainter initialized")
     self.text_detector = TextDetector()
 
+    self.maskHelper = MaskHelper()
+
   @log_function(logger)
   def create_mask(self, frame: np.ndarray, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
     """Create a mask depending on the selected mode"""
     self.logger.debug(f"Creating mask with mode: {mask_mode}")
 
     if mask_mode == MaskMode.TEXT:
-      return self.text_detector.create_subtitle_mask(frame)
+      return self.maskHelper.maskSubtitle(frame)
     elif mask_mode == MaskMode.WATERMARK:
       # Placeholder for future watermark detection
 
@@ -173,39 +175,162 @@ class VideoInpainter:
     y_min, y_max = y_indices.min(), y_indices.max()
 
     # Add padding to avoid hard seams
-    pad = 64
+    pad = 0
     x_min = max(0, x_min - pad)
     y_min = max(0, y_min - pad)
     x_max = min(frame.shape[1], x_max + pad)
     y_max = min(frame.shape[0], y_max + pad)
 
-    # Step 2: Crop
-    cropped_frame = frame[y_min:y_max, x_min:x_max]
-    # Invert the mask so white (255) becomes the area to inpaint
-    cropped_mask = 255 - mask[y_min:y_max, x_min:x_max]
+    # Calculate region dimensions
+    region_width = x_max - x_min
+    region_height = y_max - y_min
 
-    # Step 3: Inpaint small region
-    inpainted_crop = cv2.ft.inpaint(
-        cropped_frame, cropped_mask, radius, function=function, algorithm=algorithm)
+    # Determine optimal tile size (aim for tiles around 256x256)
+    tile_size = 256
+    overlap = 32  # Overlap between tiles for blending
 
-    # # TEST
-    # # Sample 5 frames for testing
-    # test_output_dir = "test_ft_inpaint_output"
-    # os.makedirs(test_output_dir, exist_ok=True)
+    # Calculate number of tiles needed
+    num_tiles_x = (region_width + tile_size - 1) // tile_size
+    num_tiles_y = (region_height + tile_size - 1) // tile_size
 
-    # frame_num = self.frame_count if hasattr(self, 'frame_count') else 0
-    # frame_name = f"frame_{frame_num}"
-
-    # cv2.imwrite(os.path.join(test_output_dir,
-    #             f"{frame_name}_inpainted_crop.png"), inpainted_crop)
-    # cv2.imwrite(os.path.join(test_output_dir,
-    #             f"{frame_name}_cropped_frame.png"), cropped_frame)
-    # cv2.imwrite(os.path.join(test_output_dir,
-    #             f"{frame_name}_cropped_mask.png"), cropped_mask)
-
-    # Step 4: Paste back
+    # Create result array
     result = frame.copy()
-    result[y_min:y_max, x_min:x_max] = inpainted_crop
+
+    # Convert frame to grayscale for edge detection
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Create CUDA stream for parallel processing
+    stream = cv2.cuda_Stream()
+
+    # Upload frame to GPU
+    gpu_frame = cv2.cuda_GpuMat()
+    gpu_frame.upload(gray_frame, stream)
+
+    # Multi-scale edge detection
+    edges_multi_scale = []
+    scales = [1.0, 0.75, 0.5]  # Different scales for edge detection
+
+    for scale in scales:
+        # Resize frame for current scale
+      scaled_width = int(gray_frame.shape[1] * scale)
+      scaled_height = int(gray_frame.shape[0] * scale)
+      gpu_scaled = cv2.cuda.resize(gpu_frame, (scaled_width, scaled_height))
+
+      # Create CUDA Canny detector with adaptive thresholds
+      canny = cv2.cuda.createCannyEdgeDetector(100, 200)
+      gpu_edges = canny.detect(gpu_scaled, stream)
+
+      # Download and resize edges back to original size
+      edges = gpu_edges.download(stream)
+      edges = cv2.resize(edges, (gray_frame.shape[1], gray_frame.shape[0]))
+      edges_multi_scale.append(edges)
+
+    # Combine multi-scale edges
+    combined_edges = np.zeros_like(gray_frame)
+    for edges in edges_multi_scale:
+      combined_edges = cv2.bitwise_or(combined_edges, edges)
+
+    # Dilate edges with adaptive kernel size
+    kernel_sizes = [3, 5, 7]
+    dilated_edges = np.zeros_like(combined_edges)
+    for ksize in kernel_sizes:
+      kernel = np.ones((ksize, ksize), np.uint8)
+      dilated = cv2.dilate(combined_edges, kernel, iterations=1)
+      dilated_edges = cv2.bitwise_or(dilated_edges, dilated)
+
+    # Combine edges with mask using guided filtering
+    edge_near_mask = cv2.bitwise_and(dilated_edges, mask)
+    guided_mask = cv2.bitwise_or(mask, edge_near_mask)
+
+    # Apply guided filter to smooth the mask while preserving edges
+    guided_mask = cv2.ximgproc.guidedFilter(
+        guide=gray_frame,
+        src=guided_mask.astype(np.float32),
+        radius=5,
+        eps=0.01
+    ).astype(np.uint8)
+
+    # Process each tile
+    for i in range(num_tiles_y):
+      for j in range(num_tiles_x):
+          # Calculate tile boundaries
+        tile_x_min = x_min + j * (tile_size - overlap)
+        tile_y_min = y_min + i * (tile_size - overlap)
+        tile_x_max = min(x_max, tile_x_min + tile_size)
+        tile_y_max = min(y_max, tile_y_min + tile_size)
+
+        # Adjust for last tiles
+        if tile_x_max == x_max:
+          tile_x_min = max(x_min, tile_x_max - tile_size)
+        if tile_y_max == y_max:
+          tile_y_min = max(y_min, tile_y_max - tile_size)
+
+        # Extract tile
+        tile_frame = frame[tile_y_min:tile_y_max, tile_x_min:tile_x_max]
+        tile_mask = 255 - \
+            guided_mask[tile_y_min:tile_y_max, tile_x_min:tile_x_max]
+
+        # Calculate texture complexity
+        tile_gray = gray_frame[tile_y_min:tile_y_max, tile_x_min:tile_x_max]
+        tile_edges = dilated_edges[tile_y_min:tile_y_max,
+                                   tile_x_min:tile_x_max]
+
+        # Calculate edge density and texture variance
+        edge_density = np.sum(tile_edges > 0) / (tile_edges.size + 1e-6)
+        texture_variance = np.var(tile_gray)
+
+        # Adaptive radius based on both edge density and texture complexity
+        base_radius = max(
+            3, min(radius, int(min(tile_frame.shape[:2]) * 0.05)))
+        complexity_factor = 1 + edge_density + (texture_variance / 1000)
+        tile_radius = int(base_radius / complexity_factor)
+
+        # Inpaint tile
+        inpainted_tile = cv2.ft.inpaint(
+            tile_frame, tile_mask, tile_radius,
+            function=function, algorithm=algorithm
+        )
+
+        # Create blending mask with texture-aware weighting
+        blend_mask = np.ones_like(tile_frame, dtype=np.float32)
+        if overlap > 0:
+          # Create smooth blending at edges
+          blend_width = min(overlap, tile_frame.shape[1] // 4)
+          blend_height = min(overlap, tile_frame.shape[0] // 4)
+
+          # Create texture-aware weights
+          texture_weights = np.zeros_like(tile_frame, dtype=np.float32)
+          # Stronger preservation at edges
+          texture_weights[tile_edges > 0] = 0.7
+
+          # Add texture variance influence
+          texture_variance_map = np.abs(tile_gray - np.mean(tile_gray)) / 255.0
+          texture_weights += texture_variance_map[..., None] * 0.3
+
+          # Horizontal blending
+          if j > 0:  # Left edge
+            blend_mask[:,
+                       :blend_width] *= np.linspace(0, 1, blend_width)[None, :, None]
+          if j < num_tiles_x - 1:  # Right edge
+            blend_mask[:, -
+                       blend_width:] *= np.linspace(1, 0, blend_width)[None, :, None]
+
+          # Vertical blending
+          if i > 0:  # Top edge
+            blend_mask[:blend_height,
+                       :] *= np.linspace(0, 1, blend_height)[:, None, None]
+          if i < num_tiles_y - 1:  # Bottom edge
+            blend_mask[-blend_height:,
+                       :] *= np.linspace(1, 0, blend_height)[:, None, None]
+
+          # Apply texture-aware weights
+          blend_mask = blend_mask * (1 - texture_weights) + texture_weights
+
+        # Blend the inpainted tile into the result
+        result[tile_y_min:tile_y_max, tile_x_min:tile_x_max] = (
+            result[tile_y_min:tile_y_max, tile_x_min:tile_x_max] * (1 - blend_mask) +
+            inpainted_tile * blend_mask
+        ).astype(np.uint8)
 
     return result
 

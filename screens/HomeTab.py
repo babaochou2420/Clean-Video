@@ -10,6 +10,9 @@ import numpy as np
 
 class HomeTab:
 
+  def __init__(self):
+    None
+
   def __load__():
 
     logger = setup_logger('HomeTab')
@@ -165,3 +168,5 @@ class HomeTab:
       )
 
     return tab
+
+  # def __widgetVideoInfo(self):

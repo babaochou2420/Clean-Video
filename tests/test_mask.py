@@ -3,7 +3,7 @@ import numpy as np
 import os
 import torch
 from tqdm import tqdm
-from daos.text_detector import TextDetector
+from daos.TextDetector import TextDetector
 from utils.logger import setup_logger
 import enum
 # Assume your VideoInpainter class and Config are defined as in your original code

@@ -7,6 +7,10 @@ class ModelEnum(enum.Enum):
   LAMA = "[GPU] LAMA"
   STTN = "[GPU] STTN"
 
+  # EASYOCR = "[GPU] EasyOCR"
+  # DB50 = "[CPU] DB50"
+  # DB18 = "[CPU] DB18"
+
   @classmethod
   def values(cls):
     return [item.value for item in cls]

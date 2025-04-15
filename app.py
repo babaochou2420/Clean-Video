@@ -8,8 +8,8 @@ import subprocess
 from datetime import timedelta
 from video_inpainter import VideoInpainter
 from screens.HomeTab import HomeTab
-from screens.settings_tab import create_settings_tab
-from screens.about_tab import create_about_tab
+from screens.SettingsTab import SettingsTab
+# from screens.about_tab import create_about_tab
 from utils.logger import setup_logger, log_function
 from typing import Optional, Tuple, Union
 
@@ -28,8 +28,8 @@ def create_app():
       # Create tabs
     logger.debug("Creating tabs")
     HomeTab.__load__()
-    settings_tab = create_settings_tab()
-    about_tab = create_about_tab()
+    SettingsTab.__load__()
+    # about_tab = create_about_tab()
     # logger.info("Interface created successfully")
 
   return demo
