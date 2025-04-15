@@ -17,3 +17,6 @@ class MaskHelper:
     red_mask[:, :, 2] = mask  # Red channel
     vis = cv2.addWeighted(image, 0.7, red_mask, 0.3, 0)
     return vis
+
+  def maskSubtitle(image: np.ndarray) -> np.ndarray:
+    None

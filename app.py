@@ -13,6 +13,10 @@ from screens.about_tab import create_about_tab
 from utils.logger import setup_logger, log_function
 from typing import Optional, Tuple, Union
 
+# import os
+# # ValueError: When localhost is not accessible, a shareable link must be created. Please set share=True or check your proxy settings to allow access to localhost.
+# os.environ["no_proxy"] = "localhost, 127.0.0.1, ::1"
+
 # Setup logger
 logger = setup_logger('app')
 
@@ -35,4 +39,4 @@ if __name__ == "__main__":
   logger.info("Starting application")
   demo = create_app()
   logger.info("Launching Gradio interface")
-  demo.launch()
+  demo.launch(server_port=15682)
