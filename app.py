@@ -23,20 +23,20 @@ logger = setup_logger('app')
 
 @log_function(logger)
 def create_app():
-  logger.info("Creating Gradio interface")
+  # logger.info("Creating Gradio interface")
   with gr.Blocks() as demo:
       # Create tabs
     logger.debug("Creating tabs")
     HomeTab.__load__()
     settings_tab = create_settings_tab()
     about_tab = create_about_tab()
-    logger.info("Interface created successfully")
+    # logger.info("Interface created successfully")
 
   return demo
 
 
-if __name__ == "__main__":
-  logger.info("Starting application")
-  demo = create_app()
-  logger.info("Launching Gradio interface")
-  demo.launch(server_port=15682)
+# logger.info("Starting application")
+demo = create_app()
+
+# logger.info("Launching Gradio interface")
+demo.launch(server_port=15682)

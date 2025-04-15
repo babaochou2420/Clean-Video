@@ -75,9 +75,17 @@ class VideoInpainter:
           return self.lama.process(frame, mask)
         case ModelEnum.OPENCV.value:
           if enableFTransform:
-            return cv2.ft.inpaint(frame, mask, inpaintRadius, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
+            result = self.fast_ft_inpaint(
+                frame, mask, inpaintRadius, cv2.ft.LINEAR, cv2.ft.ITERATIVE)
+            # return cv2.ft.inpaint(frame, mask, inpaintRadius, function=cv2.ft.LINEAR, algorithm=cv2.ft.ITERATIVE)
           else:
-            return cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_TELEA)
+            result = cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_TELEA)
+
+          # Stage 2
+          cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_NS)
+
+          return result
+
         case _:
           logger.error(f"Unknown model selected: {model}")
           return None
@@ -165,7 +173,7 @@ class VideoInpainter:
     y_min, y_max = y_indices.min(), y_indices.max()
 
     # Add padding to avoid hard seams
-    pad = 16
+    pad = 64
     x_min = max(0, x_min - pad)
     y_min = max(0, y_min - pad)
     x_max = min(frame.shape[1], x_max + pad)
@@ -180,20 +188,20 @@ class VideoInpainter:
     inpainted_crop = cv2.ft.inpaint(
         cropped_frame, cropped_mask, radius, function=function, algorithm=algorithm)
 
-    # TEST
-    # Sample 5 frames for testing
-    test_output_dir = "test_ft_inpaint_output"
-    os.makedirs(test_output_dir, exist_ok=True)
+    # # TEST
+    # # Sample 5 frames for testing
+    # test_output_dir = "test_ft_inpaint_output"
+    # os.makedirs(test_output_dir, exist_ok=True)
 
-    frame_num = self.frame_count if hasattr(self, 'frame_count') else 0
-    frame_name = f"frame_{frame_num}"
+    # frame_num = self.frame_count if hasattr(self, 'frame_count') else 0
+    # frame_name = f"frame_{frame_num}"
 
-    cv2.imwrite(os.path.join(test_output_dir,
-                f"{frame_name}_inpainted_crop.png"), inpainted_crop)
-    cv2.imwrite(os.path.join(test_output_dir,
-                f"{frame_name}_cropped_frame.png"), cropped_frame)
-    cv2.imwrite(os.path.join(test_output_dir,
-                f"{frame_name}_cropped_mask.png"), cropped_mask)
+    # cv2.imwrite(os.path.join(test_output_dir,
+    #             f"{frame_name}_inpainted_crop.png"), inpainted_crop)
+    # cv2.imwrite(os.path.join(test_output_dir,
+    #             f"{frame_name}_cropped_frame.png"), cropped_frame)
+    # cv2.imwrite(os.path.join(test_output_dir,
+    #             f"{frame_name}_cropped_mask.png"), cropped_mask)
 
     # Step 4: Paste back
     result = frame.copy()

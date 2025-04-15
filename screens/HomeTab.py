@@ -4,7 +4,7 @@ import gradio as gr
 from utils.logger import setup_logger
 from video_inpainter import VideoInpainter
 import cv2
-from daos.enums.ModelEnum import ModelEnum
+from daos.enums.ModelEnum import ModelEnum, OpenCVFTEnum
 import numpy as np
 
 
@@ -71,8 +71,8 @@ class HomeTab:
             infoVideoLength = gr.Textbox(
                 label="Duration", interactive=False)
 
-            def calFramesTotal(fps, duration):
-              return fps*duration
+            # def calFramesTotal(fps, duration):
+            #   return fps*duration
 
             def update_video_info(video_path):
               if not video_path:
@@ -95,8 +95,8 @@ class HomeTab:
                          infoFPS, stateVideoDuration]
             )
 
-            infoFPS.change(fn=calFramesTotal, inputs=[
-                infoFPS, stateVideoDuration], outputs=[infoTotalFrames])
+            # infoFPS.change(fn=calFramesTotal, inputs=[
+            # infoFPS, stateVideoDuration], outputs = [infoTotalFrames])
 
             process_btn = gr.Button("Process Video")
 
@@ -105,8 +105,7 @@ class HomeTab:
             with gr.Row():
               with gr.Column(variant="panel"):
                 gr.Markdown("# Inpaint", elem_classes=["center"])
-                switchFTransform = gr.Checkbox(
-                    label="Enable FTransform", value=False)
+
                 modelPicker = gr.Radio(
                     choices=ModelEnum.values(),
                     label="Inpainting Model",
@@ -114,6 +113,31 @@ class HomeTab:
                 )
                 inpaintRadiusSlider = gr.Slider(
                     minimum=1, maximum=9, value=3, step=1, label="Inpaint Radius")
+
+                with gr.Row():
+                  with gr.Column(scale=1):
+                    switchFTransform = gr.Checkbox(
+                        visible=True, label="Enable FTransform", value=False)
+                  with gr.Column(scale=7):
+                    modeOpenCVFTInpaint = gr.Radio(
+                        visible=False, choices=OpenCVFTEnum.values(), value=OpenCVFTEnum.ITERATIVE, label="Algorithm")
+
+                def showOpenCVFTAlgorithms(bool):
+                  return gr.update(
+                      visible=bool
+                  )
+
+                switchFTransform.change(fn=showOpenCVFTAlgorithms, inputs=[
+                                        switchFTransform], outputs=[modeOpenCVFTInpaint])
+
+                def showModelSettings_OpenCV(model):
+                  if model == ModelEnum.OPENCV.value:
+                    return gr.update(visible=True)
+                  else:
+                    return gr.update(visible=False)
+
+                modelPicker.change(fn=showModelSettings_OpenCV, inputs=[
+                    modelPicker], outputs=[switchFTransform])
 
       with gr.Row():
         output_video = gr.Video(label="Processed Video")
