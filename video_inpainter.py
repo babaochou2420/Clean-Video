@@ -65,7 +65,7 @@ class VideoInpainter:
     #   self.logger.debug("Fallback bottom strip mask created")
 
   @log_function(logger)
-  def process_video(self, video_path: str, output_path: str, model, enableFTransform: bool = False, mask_mode: MaskMode = MaskMode.TEXT) -> Optional[str]:
+  def process_video(self, video_path: str, output_path: str, model: str, enableFTransform: bool = False, mask_mode: MaskMode = MaskMode.TEXT) -> Optional[str]:
     """Process the video and apply inpainting on detected text regions"""
     self.logger.info(
         f"Start video processing with [{model}] on mask mode: {mask_mode}")
@@ -100,21 +100,21 @@ class VideoInpainter:
 
         mask = self.create_mask(frame)
 
-        # match model:
-        #   case ModelEnum.LAMA.value:
-        #     inpainted = self.lama.process(frame, mask)
+        match model:
+          case ModelEnum.LAMA.value:
+            inpainted = self.lama.process(frame, mask)
 
-        #   case ModelEnum.OPENCV.value:
+          case ModelEnum.OPENCV.value:
+            if enableFTransform:
+              # MULTI_STEP and ITERATIVE will be taking forever for high resolution
+              inpainted = self.fast_ft_inpaint(
+                  frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ITERATIVE)
+            else:
+              inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
+          case _:
+            logger.error(f"Unknown model selected: {model}")
 
-        #     if enableFTransform:
-        #       # MULTI_STEP and ITERATIVE will be taking forever for high resolution
-        #       inpainted = cv2.ft.inpaint(
-        #           frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
-        #     else:
-        #       inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
-
-        inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
-
+        # inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
         out.write(inpainted)
 
         pbar.update(1)
@@ -136,3 +136,57 @@ class VideoInpainter:
     # elif model == "STTN":
     #   from daos.models.STTN import STTN
     #   return STTN()
+
+  #
+  # [LOGIC]
+  # 1. Inpaint the cropped region instead of whole resolution which cause MULTI_STEP and ITERATIVE to take forever
+  # 2. Paste the inpainted region back to the frame
+  # 3. Return the result
+  #
+  def fast_ft_inpaint(self,
+                      frame, mask, radius=3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP):
+    # Step 1: Get bounding box of non-zero region
+    y_indices, x_indices = np.where(mask > 0)
+    if len(x_indices) == 0 or len(y_indices) == 0:
+        # Nothing to inpaint
+      return frame.copy()
+
+    x_min, x_max = x_indices.min(), x_indices.max()
+    y_min, y_max = y_indices.min(), y_indices.max()
+
+    # Add padding to avoid hard seams
+    pad = 16
+    x_min = max(0, x_min - pad)
+    y_min = max(0, y_min - pad)
+    x_max = min(frame.shape[1], x_max + pad)
+    y_max = min(frame.shape[0], y_max + pad)
+
+    # Step 2: Crop
+    cropped_frame = frame[y_min:y_max, x_min:x_max]
+    # Invert the mask so white (255) becomes the area to inpaint
+    cropped_mask = 255 - mask[y_min:y_max, x_min:x_max]
+
+    # Step 3: Inpaint small region
+    inpainted_crop = cv2.ft.inpaint(
+        cropped_frame, cropped_mask, radius, function=function, algorithm=algorithm)
+
+    # TEST
+    # Sample 5 frames for testing
+    test_output_dir = "test_ft_inpaint_output"
+    os.makedirs(test_output_dir, exist_ok=True)
+
+    frame_num = self.frame_count if hasattr(self, 'frame_count') else 0
+    frame_name = f"frame_{frame_num}"
+
+    cv2.imwrite(os.path.join(test_output_dir,
+                f"{frame_name}_inpainted_crop.png"), inpainted_crop)
+    cv2.imwrite(os.path.join(test_output_dir,
+                f"{frame_name}_cropped_frame.png"), cropped_frame)
+    cv2.imwrite(os.path.join(test_output_dir,
+                f"{frame_name}_cropped_mask.png"), cropped_mask)
+
+    # Step 4: Paste back
+    result = frame.copy()
+    result[y_min:y_max, x_min:x_max] = inpainted_crop
+
+    return result

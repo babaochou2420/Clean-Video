@@ -79,19 +79,19 @@ class HomeTab:
               value=ModelEnum.LAMA
           )
 
-      def process_video(video_path, model, progress=gr.Progress(track_tqdm=True)):
+      def process_video(video_path, model, enableFTransform, progress=gr.Progress(track_tqdm=True)):
         try:
           inpainter = VideoInpainter()
           output_path = "output_video.mp4"
           result = inpainter.process_video(
-              video_path, output_path, model, switchFTransform)
+              video_path, output_path, model, enableFTransform)
           return result
         except Exception as e:
           return str(e)
 
       process_btn.click(
           fn=process_video,
-          inputs=[input_video, modelPicker],
+          inputs=[input_video, modelPicker, switchFTransform],
           outputs=output_video
       )
 
