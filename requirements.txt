@@ -1,4 +1,6 @@
-gradio==5.25.0
+# gradio==5.25.0
+# Using old version because hot-reload not working properly
+gradio==4.44.1
 opencv-contrib-python==4.11.0.86
 numpy==1.26.4
 pytesseract==0.3.13

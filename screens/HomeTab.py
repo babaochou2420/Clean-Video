@@ -35,7 +35,9 @@ class HomeTab:
                     show_label=True,
                     elem_id="preview_gallery",
                     columns=2,
-                    height="auto"
+                    height="auto",
+                    preview=True,
+                    allow_preview=True
                 )
                 genPreviewBtn = gr.Button("Generate Preview")
 
