@@ -12,6 +12,7 @@ import gradio as gr
 from PIL import Image
 import sys
 import subprocess
+from daos.MaskHelper import MaskHelper
 from utils.logger import setup_logger, log_function
 from tqdm import tqdm
 
@@ -65,6 +66,26 @@ class VideoInpainter:
     #   self.logger.debug("Fallback bottom strip mask created")
 
   @log_function(logger)
+  def processFrame(self, frame: np.ndarray, mask: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
+    """Process a single frame with the specified model and parameters"""
+    try:
+      match model:
+        case ModelEnum.LAMA.value:
+          self.loadModel(model)
+          return self.lama.process(frame, mask)
+        case ModelEnum.OPENCV.value:
+          if enableFTransform:
+            return cv2.ft.inpaint(frame, mask, inpaintRadius, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP)
+          else:
+            return cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_TELEA)
+        case _:
+          logger.error(f"Unknown model selected: {model}")
+          return None
+    except Exception as e:
+      self.logger.error(f"Error processing frame: {e}")
+      return None
+
+  @log_function(logger)
   def process_video(self, video_path: str, output_path: str, model: str, enableFTransform: bool = False, mask_mode: MaskMode = MaskMode.TEXT) -> Optional[str]:
     """Process the video and apply inpainting on detected text regions"""
     self.logger.info(
@@ -80,16 +101,13 @@ class VideoInpainter:
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    self.logger.info(
-        f"{width}x{height} @ {fps}fps | {total_frames} frames")
+    self.logger.info(f"{width}x{height} @ {fps}fps | {total_frames} frames")
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     if not out.isOpened():
       self.logger.error("Could not create output video file")
       return None
-
-    # self.loadModel(model)
 
     with tqdm(total=total_frames) as pbar:
       while cap.isOpened():
@@ -99,24 +117,16 @@ class VideoInpainter:
           break
 
         mask = self.create_mask(frame)
+        if mask is None:
+          self.logger.error("Failed to create mask")
+          continue
 
-        match model:
-          case ModelEnum.LAMA.value:
-            inpainted = self.lama.process(frame, mask)
+        inpainted = self.processFrame(frame, mask, model, enableFTransform)
+        if inpainted is None:
+          self.logger.error("Failed to process frame")
+          continue
 
-          case ModelEnum.OPENCV.value:
-            if enableFTransform:
-              # MULTI_STEP and ITERATIVE will be taking forever for high resolution
-              inpainted = self.fast_ft_inpaint(
-                  frame, mask, 3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ITERATIVE)
-            else:
-              inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
-          case _:
-            logger.error(f"Unknown model selected: {model}")
-
-        # inpainted = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
         out.write(inpainted)
-
         pbar.update(1)
 
     pbar.close()
@@ -190,3 +200,40 @@ class VideoInpainter:
     result[y_min:y_max, x_min:x_max] = inpainted_crop
 
     return result
+
+  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Generate a preview of the inpainting process by processing a random frame from the video.
+    Returns the original frame, generated mask, and processed result.
+
+    Args:
+        video_path (str): Path to the input video file
+        output_folder (str): Path to save the preview results
+
+    Returns:
+        tuple: (original_frame, mask, processed_frame) as numpy arrays
+    """
+
+    # Open video and get random frame
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+      raise RuntimeError("Could not open video file")
+
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    random_frame_idx = np.random.randint(0, total_frames)
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame_idx)
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+      raise RuntimeError("Could not read frame from video")
+
+    # Generate mask and process the frame
+    mask = self.create_mask(frame)
+    preview = self.processFrame(
+        frame, mask, model, enableFTransform, inpaintRadius)
+
+    maskOverlay = MaskHelper.maskOverlay(frame, mask)
+
+    return maskOverlay, preview
