@@ -53,13 +53,13 @@ class VideoInpainter:
 
     if mask_mode == MaskMode.TEXT:
       return self.maskHelper.maskSubtitle(frame)
-    # elif mask_mode == MaskMode.WATERMARK:
-    #   # Placeholder for future watermark detection
+    elif mask_mode == MaskMode.WATERMARK:
+      # Placeholder for future watermark detection
 
-    #   self.logger.warning(
-    #       "Watermark mask mode not implemented yet, returning empty mask")
+      self.logger.warning(
+          "Watermark mask mode not implemented yet, returning empty mask")
 
-    #   return np.zeros(frame.shape[:2], dtype=np.uint8)
+      return np.zeros(frame.shape[:2], dtype=np.uint8)
     # else:
     #   # Fallback to simple bottom height_percent
     #   height = frame.shape[0]
@@ -68,56 +68,29 @@ class VideoInpainter:
     #   self.logger.debug("Fallback bottom strip mask created")
 
   @log_function(logger)
-  def processFrame(self, frame: np.ndarray, masks: List[np.ndarray], model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
-    """Process a single frame with multiple masks using cropping for efficiency"""
+  def processFrame(self, frame: np.ndarray, mask: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
+    """Process a single frame with the specified model and parameters"""
     try:
-      result = frame.copy()
+      match model:
+        case ModelEnum.LAMA.value:
+          self.loadModel(model)
+          return self.lama.process(frame, mask)
+        case ModelEnum.OPENCV.value:
+          if enableFTransform:
+            result = self.fast_ft_inpaint(
+                frame, mask, inpaintRadius, cv2.ft.LINEAR, cv2.ft.ITERATIVE)
+            # return cv2.ft.inpaint(frame, mask, inpaintRadius, function=cv2.ft.LINEAR, algorithm=cv2.ft.ITERATIVE)
+          else:
+            result = cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_TELEA)
 
-      for mask in masks:
-        # Skip empty masks
-        if np.sum(mask) == 0:
-          continue
+          # Stage 2
+          cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_NS)
 
-        # Get bounding box of the mask
-        y_indices, x_indices = np.where(mask > 0)
-        if len(x_indices) == 0 or len(y_indices) == 0:
-          continue
+          return result
 
-        x_min, x_max = x_indices.min(), x_indices.max()
-        y_min, y_max = y_indices.min(), y_indices.max()
-
-        # Add padding to avoid hard seams
-        pad = 0
-        x_min = max(0, x_min - pad)
-        y_min = max(0, y_min - pad)
-        x_max = min(frame.shape[1], x_max + pad)
-        y_max = min(frame.shape[0], y_max + pad)
-
-        # Crop the region
-        cropped_frame = frame[y_min:y_max, x_min:x_max]
-        cropped_mask = mask[y_min:y_max, x_min:x_max]
-
-        # Process the cropped region
-        match model:
-          case ModelEnum.LAMA.value:
-            self.loadModel(model)
-            inpainted_region = self.lama.process(cropped_frame, cropped_mask)
-          case ModelEnum.OPENCV.value:
-            if enableFTransform:
-              inpainted_region = self.fast_ft_inpaint(
-                  cropped_frame, cropped_mask, inpaintRadius, cv2.ft.LINEAR, cv2.ft.ITERATIVE)
-            else:
-              inpainted_region = cv2.inpaint(
-                  cropped_frame, cropped_mask, inpaintRadius, cv2.INPAINT_TELEA)
-          case _:
-            logger.error(f"Unknown model selected: {model}")
-            return None
-
-        # Paste the inpainted region back
-        result[y_min:y_max, x_min:x_max] = inpainted_region
-
-        return result
-
+        case _:
+          logger.error(f"Unknown model selected: {model}")
+          return None
     except Exception as e:
       self.logger.error(f"Error processing frame: {e}")
       return None
@@ -153,17 +126,12 @@ class VideoInpainter:
           self.logger.info("End of video reached")
           break
 
-        # Get list of masks for the frame
-        masks = self.create_mask(frame)
-        if not masks:  # Check if list is empty
-          self.logger.warning("No masks created for frame")
-          out.write(frame)  # Write original frame if no masks
-          pbar.update(1)
+        mask = self.create_mask(frame)
+        if mask is None:
+          self.logger.error("Failed to create mask")
           continue
 
-        # Process frame with all masks
-        inpainted = self.processFrame(frame, masks, model, enableFTransform)
-
+        inpainted = self.processFrame(frame, mask, model, enableFTransform)
         if inpainted is None:
           self.logger.error("Failed to process frame")
           continue
@@ -176,16 +144,15 @@ class VideoInpainter:
     out.release()
 
     self.logger.info(f"Processing complete. Output saved to: {output_path}")
+
     return output_path
 
   def loadModel(self, model: str):
     if model == ModelEnum.LAMA.value:
-      None
+      from daos.models.LAMA import LAMA
 
-      # from daos.models.LAMA import LAMA
-
-      # self.lama = LAMA(config["models"]["LAMA"]["ckpt"],
-      #                  config["models"]["LAMA"]["config"], device="CUDA")
+      self.lama = LAMA(config["models"]["LAMA"]["ckpt"],
+                       config["models"]["LAMA"]["config"], device="CUDA")
     # elif model == "STTN":
     #   from daos.models.STTN import STTN
     #   return STTN()
@@ -396,10 +363,10 @@ class VideoInpainter:
       raise RuntimeError("Could not read frame from video")
 
     # Generate mask and process the frame
-    fullmask, masks = self.create_mask(frame)
+    mask = self.create_mask(frame)
     preview = self.processFrame(
-        frame, masks, model, enableFTransform, inpaintRadius)
+        frame, mask, model, enableFTransform, inpaintRadius)
 
-    maskOverlay = MaskHelper.maskOverlay(frame, fullmask)
+    maskOverlay = MaskHelper.maskOverlay(frame, mask)
 
     return maskOverlay, preview

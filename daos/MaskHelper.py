@@ -69,28 +69,10 @@ class MaskHelper:
 
     return refined_boxes
 
-  def split_connected_components(self, mask: np.ndarray) -> list:
-    """Split mask into individual connected components."""
-    # Find connected components
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-        mask)
-
-    # Create a list to store individual masks
-    component_masks = []
-
-    # Process each component (skip background label 0)
-    for i in range(1, num_labels):
-      # Create a mask for this component
-      component_mask = np.zeros_like(mask)
-      component_mask[labels == i] = 255
-      component_masks.append(component_mask)
-
-    return component_masks
-
   def visualize_mask_creation(self, image: np.ndarray, results, refined_boxes, final_mask: np.ndarray):
     """Visualize the step-by-step process of mask creation and save to PNG."""
     # Create a figure with subplots
-    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
 
     # Original image with EasyOCR boxes
     img_with_boxes = image.copy()
@@ -115,33 +97,14 @@ class MaskHelper:
       x1, y1, x2, y2 = box
       cv2.rectangle(img_with_refined, (int(x1), int(y1)),
                     (int(x2), int(y2)), (0, 0, 255), 2)
-    axes[0, 2].imshow(cv2.cvtColor(img_with_refined, cv2.COLOR_BGR2RGB))
-    axes[0, 2].set_title('Image with Refined Character Boxes')
-    axes[0, 2].axis('off')
-
-    # Final mask
-    axes[1, 0].imshow(final_mask, cmap='gray')
-    axes[1, 0].set_title('Final Mask')
+    axes[1, 0].imshow(cv2.cvtColor(img_with_refined, cv2.COLOR_BGR2RGB))
+    axes[1, 0].set_title('Image with Refined Character Boxes')
     axes[1, 0].axis('off')
 
-    # Split into connected components
-    component_masks = self.split_connected_components(final_mask)
-
-    # Show first component mask
-    if component_masks:
-      axes[1, 1].imshow(component_masks[0], cmap='gray')
-      axes[1, 1].set_title('First Component Mask')
-      axes[1, 1].axis('off')
-
-    # Show all components overlaid on image
-    img_with_components = image.copy()
-    for i, comp_mask in enumerate(component_masks):
-      # Create a random color for each component
-      color = np.random.randint(0, 255, 3).tolist()
-      img_with_components[comp_mask > 0] = color
-    axes[1, 2].imshow(cv2.cvtColor(img_with_components, cv2.COLOR_BGR2RGB))
-    axes[1, 2].set_title('All Components Overlay')
-    axes[1, 2].axis('off')
+    # Final mask
+    axes[1, 1].imshow(final_mask, cmap='gray')
+    axes[1, 1].set_title('Final Mask')
+    axes[1, 1].axis('off')
 
     plt.tight_layout()
 
@@ -149,7 +112,7 @@ class MaskHelper:
     output_dir = os.path.join(os.path.dirname(
         os.path.dirname(__file__)), 'tests', 'output')
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'mask_creation_process.png')
+    output_path = os.path.join(output_dir, 'maskCreation_v2.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()  # Close the figure to free memory
 
@@ -172,24 +135,13 @@ class MaskHelper:
       x1, y1, x2, y2 = box
       cv2.rectangle(mask, (int(x1), int(y1)), (int(x2), int(y2)), 255, -1)
 
-    # Split into connected components
-    component_masks = self.split_connected_components(mask)
-
     # # Visualize the process
     # self.visualize_mask_creation(image, results, refined_boxes, mask)
 =======
     mask = self.addLineStructure(image, mask)
 >>>>>>> parent of e1273ad (update mask creation function with morphy)
 
-    # Save individual component masks
-    output_dir = os.path.join(os.path.dirname(
-        os.path.dirname(__file__)), 'tests', 'multi_partial')
-    os.makedirs(output_dir, exist_ok=True)
-    for i, comp_mask in enumerate(component_masks):
-      output_path = os.path.join(output_dir, f'partial_mask_{i}.png')
-      cv2.imwrite(output_path, comp_mask)
-
-    return mask, component_masks
+    return mask
 
   # def addLineStructure(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
   #   edges = cv2.Canny(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 100, 200)
