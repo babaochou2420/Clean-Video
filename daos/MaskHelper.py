@@ -172,7 +172,7 @@ class MaskHelper:
     # self.visualize_mask_creation(image, results, refined_boxes, mask)
 
     for (bbox, text, confidence) in results:
-      mask = self.generate_text_mask_with_rembg(image, bbox)
+      mask = self.generate_text_mask_with_rembg(image, bbox, mask)
     return mask
 
   # def addLineStructure(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -198,7 +198,7 @@ class MaskHelper:
 
   #   return guided_mask
 
-  def generate_text_mask_with_rembg(self, image: np.ndarray, bbox: list) -> np.ndarray:
+  def generate_text_mask_with_rembg(self, image: np.ndarray, bbox: list, mask: np.ndarray) -> np.ndarray:
     """
     For each bounding box, crop the region, apply rembg to extract text-like foreground,
     and merge all resulting masks into one binary mask.
@@ -211,7 +211,7 @@ class MaskHelper:
         np.ndarray: Final binary mask with detected text regions (0 or 255).
     """
     height, width = image.shape[:2]
-    final_mask = np.zeros((height, width), dtype=np.uint8)
+    box_mask = np.zeros((height, width), dtype=np.uint8)
     # Get bounding box coordinates
     x_coords = [int(pt[0]) for pt in bbox]
     y_coords = [int(pt[1]) for pt in bbox]
@@ -222,8 +222,10 @@ class MaskHelper:
     cropped = image[y1:y2, x1:x2]
     # Preprocessing
     # - Histogram Equalization
+    # Apply CLAHE to each RGB channel separately
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cropped = clahe.apply(cropped)
+    cropped_rgb = [clahe.apply(cropped[:, :, i]) for i in range(3)]
+    cropped = cv2.merge(cropped_rgb)
     # - Sharpening
     kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
     cropped = cv2.filter2D(cropped, -1, kernel)
@@ -245,7 +247,7 @@ class MaskHelper:
     # Resize alpha mask to original bbox size and place into final mask
     mask_region = cv2.resize(
         alpha, (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR)
-    final_mask[y1:y2, x1:x2] = cv2.bitwise_or(
-        final_mask[y1:y2, x1:x2], mask_region)
+    box_mask[y1:y2, x1:x2] = cv2.bitwise_or(
+        box_mask[y1:y2, x1:x2], mask_region)
 
-    return final_mask
+    return cv2.bitwise_or(mask, box_mask)
