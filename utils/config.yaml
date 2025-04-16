@@ -1,6 +1,16 @@
 # config.yaml
 
 models:
+  BASE: 
+    TextDetection: "models/TextDetection"
   LAMA:
     ckpt: "./models/lama/big-lama.pth"
     config: "./models/lama/config.yaml"
+
+  PATH:
+    TextDetection:
+      EAST: "frozen_east_text_detection.pb"
+      DB50: "DB_TD500_resnet50.onnx"
+
+
+
