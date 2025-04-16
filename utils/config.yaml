@@ -4,8 +4,8 @@ models:
   BASE: 
     TextDetection: "models/TextDetection"
   LAMA:
-    ckpt: "./models/lama/big-lama.pth"
-    config: "./models/lama/config.yaml"
+    ckpt: "models/Inpainter/lama/big-lama.ckpt"
+    config: "models/Inpainter/lama/config.yaml"
 
   PATH:
     TextDetection:

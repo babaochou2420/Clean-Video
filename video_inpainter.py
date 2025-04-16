@@ -21,7 +21,6 @@ from daos.enums.ModelEnum import ModelEnum
 from utils.config import Config
 from daos.TextDetector import TextDetector
 
-config = Config.get_config()
 
 # Setup logger
 logger = setup_logger('video_inpainter')
@@ -44,6 +43,10 @@ class VideoInpainter:
     self.logger.info("VideoInpainter initialized")
     self.text_detector = TextDetector()
 
+    self.config = Config.get_config()
+
+    self.lama = None
+
     self.maskHelper = MaskHelper()
 
   @log_function(logger)
@@ -60,12 +63,6 @@ class VideoInpainter:
           "Watermark mask mode not implemented yet, returning empty mask")
 
       return np.zeros(frame.shape[:2], dtype=np.uint8)
-    # else:
-    #   # Fallback to simple bottom height_percent
-    #   height = frame.shape[0]
-    #   mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-    #   mask[int(height * (1 - height_percent)):, :] = 255
-    #   self.logger.debug("Fallback bottom strip mask created")
 
   @log_function(logger)
   def processFrame(self, frame: np.ndarray, mask: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
@@ -73,7 +70,7 @@ class VideoInpainter:
     try:
       match model:
         case ModelEnum.LAMA.value:
-          self.loadModel(model)
+
           return self.lama.process(frame, mask)
         case ModelEnum.OPENCV.value:
           if enableFTransform:
@@ -119,6 +116,8 @@ class VideoInpainter:
       self.logger.error("Could not create output video file")
       return None
 
+    self.loadModel(model)
+
     with tqdm(total=total_frames) as pbar:
       while cap.isOpened():
         ret, frame = cap.read()
@@ -149,13 +148,13 @@ class VideoInpainter:
 
   def loadModel(self, model: str):
     if model == ModelEnum.LAMA.value:
-      from daos.models.LAMA import LAMA
+      from daos.inpainter.LAMA import LAMA
 
-      self.lama = LAMA(config["models"]["LAMA"]["ckpt"],
-                       config["models"]["LAMA"]["config"], device="CUDA")
-    # elif model == "STTN":
-    #   from daos.models.STTN import STTN
-    #   return STTN()
+      self.logger.info(
+          f"Loading LAMA model from {self.config['models']['LAMA']['ckpt']} and {self.config['models']['LAMA']['config']}")
+
+      self.lama = LAMA(self.config["models"]["LAMA"]["ckpt"],
+                       self.config["models"]["LAMA"]["config"], device="cuda")
 
   #
   # [LOGIC]
@@ -346,6 +345,7 @@ class VideoInpainter:
     Returns:
         tuple: (original_frame, mask, processed_frame) as numpy arrays
     """
+    self.loadModel(model)
 
     # Open video and get random frame
     cap = cv2.VideoCapture(video_path)

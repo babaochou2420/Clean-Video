@@ -8,4 +8,9 @@ easyocr==1.7.2
 
 omegaconf==2.3.0
 
+# LAMA
+pytorch-lightning
+albumentations==2.0.5
+webdataset
+easydict
 
