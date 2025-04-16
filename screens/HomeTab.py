@@ -34,6 +34,7 @@ class HomeTab:
             with gr.Row():
               with gr.Column():
                 preview_gallery = gr.Gallery(
+                    format="png",
                     label="Preview",
                     show_label=True,
                     elem_id="preview_gallery",
