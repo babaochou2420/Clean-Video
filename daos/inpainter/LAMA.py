@@ -1,108 +1,42 @@
-import torch
-import cv2
-import numpy as np
 import os
+from typing import Union
+import torch
+import numpy as np
 from PIL import Image
-import yaml
-
+from daos.inpainter.lama_utils import prepare_img_and_mask
 from utils import logger
 from utils.config import Config
-from torchvision import transforms
-
-
-import sys
-from pathlib import Path
-
-# Add the parent directory to Python path
-sys.path.append(str(Path(__file__).parent))
 
 
 class LAMA:
-  def __init__(self, model_path, config_path, device='cuda'):
-    self.model_path = model_path
-    self.config_path = config_path
-    self.device = torch.device(device) if torch.cuda.is_available(
-    ) and device == 'cuda' else torch.device('cpu')
-    self.model = None
-    self.transform = None
-    self.load_model()
+  def __init__(self, device: torch.device = None):
+    self.config = Config.get_config()
+    self.device = device or torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu")
+    self.model_path = os.path.join(self.config['models']['BASE']['Inpainter'],
+                                   self.config['models']['LAMA']['ckpt'])
 
-    self.logger = logger.setup_logger("LAMA")
+    self.logger = logger.setup_logger(self.__class__.__name__)
 
-  def load_model(self):
-    if not os.path.exists(self.model_path):
-      raise FileNotFoundError(
-          f"Model checkpoint not found at {self.model_path}")
-    if not os.path.exists(self.config_path):
-      raise FileNotFoundError(f"Config file not found at {self.config_path}")
+    if not os.path.isfile(self.model_path):
+      raise FileNotFoundError(f"Model not found at {self.model_path}")
 
-    try:
-      print(f"Loading LAMA config from {self.config_path}...")
-      with open(self.config_path, 'r') as f:
-        config = yaml.safe_load(f)
+    # checkpoint = torch.load(self.model_path, map_location=self.device)
 
-      self.setup_transform(config)
+    # self.logger.info(f"Loading LAMA model from {checkpoint}")
 
-      print("Building LAMA model...")
-      from daos.inpainter.saicinpainting.training.trainers import load_checkpoint
+    # self.model = checkpoint['model']
 
-      # Load model from checkpoint with full config and architecture
-      train_config = config.get('model', config)
-      self.model = load_checkpoint(
-          train_config, self.model_path, strict=False, map_location=self.device)['model']
-      self.model.freeze()  # turn off grad
-      self.model.eval()
-      self.model.to(self.device)
+    self.model = torch.jit.load(self.model_path, map_location=self.device)
 
-      print("LAMA model loaded and ready.")
+    self.model.eval().to(self.device)
 
-    except Exception as e:
-      raise RuntimeError(f"Error loading LAMA model: {e}")
+  def __call__(self, image: Union[Image.Image, np.ndarray], mask: Union[Image.Image, np.ndarray]) -> np.ndarray:
+    orig_height, orig_width = np.array(image).shape[:2]
 
-  def setup_transform(self, config):
-    # You can customize this as needed based on LaMa config
-    self.transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-
-  def prepare_input(self, image: np.ndarray, mask: np.ndarray) -> dict:
-    """
-    Converts an OpenCV image and binary mask to input format expected by LaMa.
-    """
-    if image.dtype != np.uint8:
-      raise ValueError("Image must be uint8")
-
-    if mask.ndim == 3:
-      mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    mask = (mask > 0).astype(np.uint8) * 255
-
-    # Convert to RGB
-    if image.shape[2] == 4:
-      image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
-    else:
-      image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    image_pil = Image.fromarray(image)
-    mask_pil = Image.fromarray(mask)
-
-    image_tensor = self.transform(image_pil).unsqueeze(0).to(self.device)
-    mask_tensor = self.transform(mask_pil).unsqueeze(0).to(self.device)
-
-    batch = {
-        'image': image_tensor,
-        'mask': mask_tensor
-    }
-
-    return batch
-
-  def process(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """
-    Runs inpainting on the given image and mask.
-    """
-    with torch.no_grad():
-      batch = self.prepare_input(image, mask)
-      result = self.model(batch)['inpainted']
-
-      result = result[0].clamp(0, 1).cpu().numpy()
-      result = (result.transpose(1, 2, 0) * 255).astype(np.uint8)
-      return cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+    image_tensor, mask_tensor = prepare_img_and_mask(image, mask, self.device)
+    with torch.inference_mode():
+      output = self.model(image_tensor, mask_tensor)[0]
+      result = output.permute(1, 2, 0).cpu().numpy()
+      result = (np.clip(result, 0, 1) * 255).astype(np.uint8)
+      return result[:orig_height, :orig_width]

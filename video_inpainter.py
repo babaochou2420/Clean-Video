@@ -71,7 +71,7 @@ class VideoInpainter:
       match model:
         case ModelEnum.LAMA.value:
 
-          return self.lama.process(frame, mask)
+          return self.lama.__call__(frame, mask)
         case ModelEnum.OPENCV.value:
           if enableFTransform:
             result = self.fast_ft_inpaint(
@@ -150,11 +150,7 @@ class VideoInpainter:
     if model == ModelEnum.LAMA.value:
       from daos.inpainter.LAMA import LAMA
 
-      self.logger.info(
-          f"Loading LAMA model from {self.config['models']['LAMA']['ckpt']} and {self.config['models']['LAMA']['config']}")
-
-      self.lama = LAMA(self.config["models"]["LAMA"]["ckpt"],
-                       self.config["models"]["LAMA"]["config"], device="cuda")
+      self.lama = LAMA(device="cuda")
 
   #
   # [LOGIC]
@@ -368,5 +364,8 @@ class VideoInpainter:
         frame, mask, model, enableFTransform, inpaintRadius)
 
     maskOverlay = MaskHelper.maskOverlay(frame, mask)
+
+    cv2.imwrite("preview_maskOverlay.png", maskOverlay)
+    cv2.imwrite("preview_inpainted.png", preview)
 
     return maskOverlay, preview
