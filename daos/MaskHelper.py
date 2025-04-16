@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 import easyocr
 import os
-import matplotlib.pyplot as plt
 
 
 class MaskHelper:
@@ -20,6 +19,7 @@ class MaskHelper:
     vis = cv2.addWeighted(image, 0.7, red_mask, 0.3, 0)
     return vis
 
+<<<<<<< HEAD
   # @log_function(logger)
   # def maskSubtitle(self, image: np.ndarray) -> np.ndarray:
   #   """Detects text in the image and returns a binary mask of detected text regions."""
@@ -153,6 +153,8 @@ class MaskHelper:
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()  # Close the figure to free memory
 
+=======
+>>>>>>> parent of e1273ad (update mask creation function with morphy)
   @log_function(logger)
   def maskSubtitle(self, image: np.ndarray) -> np.ndarray:
     """Detects text in the image and returns a binary mask of detected text regions."""
@@ -160,9 +162,11 @@ class MaskHelper:
     results = reader.readtext(image)
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
 
-    # Get refined character-level bounding boxes
-    refined_boxes = self.refine_bbox(image, results)
+    for (bbox, text, confidence) in results:
+      pts = np.array(bbox, dtype=np.int32)
+      cv2.fillPoly(mask, [pts], 255)
 
+<<<<<<< HEAD
     # Create mask from refined boxes
     for box in refined_boxes:
       x1, y1, x2, y2 = box
@@ -173,6 +177,9 @@ class MaskHelper:
 
     # # Visualize the process
     # self.visualize_mask_creation(image, results, refined_boxes, mask)
+=======
+    mask = self.addLineStructure(image, mask)
+>>>>>>> parent of e1273ad (update mask creation function with morphy)
 
     # Save individual component masks
     output_dir = os.path.join(os.path.dirname(
