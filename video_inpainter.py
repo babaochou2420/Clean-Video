@@ -45,8 +45,6 @@ class VideoInpainter:
 
     self.config = Config.get_config()
 
-    self.lama = None
-
     self.maskHelper = MaskHelper()
 
   @log_function(logger)
@@ -65,14 +63,17 @@ class VideoInpainter:
       return np.zeros(frame.shape[:2], dtype=np.uint8)
 
   @log_function(logger)
-  def processFrame(self, frame: np.ndarray, mask: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
+  def processFrame(self, frame: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
     """Process a single frame with the specified model and parameters"""
     try:
       match model:
         case ModelEnum.LAMA.value:
+          mask = self.maskHelper.maskSubtitleBBoxes(frame)
 
-          return self.lama.__call__(frame, mask)
+          return self.lama.__call__(frame, mask), mask
         case ModelEnum.OPENCV.value:
+          mask = self.maskHelper.maskSubtitle(frame)
+
           if enableFTransform:
             result = self.fast_ft_inpaint(
                 frame, mask, inpaintRadius, cv2.ft.LINEAR, cv2.ft.ITERATIVE)
@@ -83,7 +84,7 @@ class VideoInpainter:
           # Stage 2
           cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_NS)
 
-          return result
+          return result, mask
 
         case _:
           logger.error(f"Unknown model selected: {model}")
@@ -125,12 +126,7 @@ class VideoInpainter:
           self.logger.info("End of video reached")
           break
 
-        mask = self.create_mask(frame)
-        if mask is None:
-          self.logger.error("Failed to create mask")
-          continue
-
-        inpainted = self.processFrame(frame, mask, model, enableFTransform)
+        inpainted, mask = self.processFrame(frame, model, enableFTransform)
         if inpainted is None:
           self.logger.error("Failed to process frame")
           continue
@@ -341,6 +337,7 @@ class VideoInpainter:
     Returns:
         tuple: (original_frame, mask, processed_frame) as numpy arrays
     """
+
     self.loadModel(model)
 
     # Open video and get random frame
@@ -351,6 +348,9 @@ class VideoInpainter:
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     random_frame_idx = np.random.randint(0, total_frames)
 
+    self.logger.debug(
+        f"[RUN] genPreview | Working on frame {random_frame_idx}")
+
     cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame_idx)
     ret, frame = cap.read()
     cap.release()
@@ -359,13 +359,14 @@ class VideoInpainter:
       raise RuntimeError("Could not read frame from video")
 
     # Generate mask and process the frame
-    mask = self.create_mask(frame)
-    preview = self.processFrame(
-        frame, mask, model, enableFTransform, inpaintRadius)
+    preview, mask = self.processFrame(
+        frame, model, enableFTransform, inpaintRadius)
 
     maskOverlay = MaskHelper.maskOverlay(frame, mask)
 
     cv2.imwrite("preview_maskOverlay.png", maskOverlay)
     cv2.imwrite("preview_inpainted.png", preview)
+
+    self.logger.debug(f"[END] genPreview")
 
     return maskOverlay, preview

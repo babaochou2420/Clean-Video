@@ -7,6 +7,8 @@ from daos.inpainter.lama_utils import prepare_img_and_mask
 from utils import logger
 from utils.config import Config
 
+# https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt
+
 
 class LAMA:
   def __init__(self, device: torch.device = None):
@@ -14,7 +16,7 @@ class LAMA:
     self.device = device or torch.device(
         "cuda" if torch.cuda.is_available() else "cpu")
     self.model_path = os.path.join(self.config['models']['BASE']['Inpainter'],
-                                   self.config['models']['LAMA']['ckpt'])
+                                   self.config['models']['PATH']['Inpainter']['LAMA'])
 
     self.logger = logger.setup_logger(self.__class__.__name__)
 
@@ -26,6 +28,8 @@ class LAMA:
     # self.logger.info(f"Loading LAMA model from {checkpoint}")
 
     # self.model = checkpoint['model']
+
+    self.logger.info(f"Loading LAMA model from {self.model_path}")
 
     self.model = torch.jit.load(self.model_path, map_location=self.device)
 

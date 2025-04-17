@@ -4,11 +4,10 @@ models:
   BASE: 
     TextDetection: "models/TextDetection"
     Inpainter: "models/Inpainter"
-  LAMA:
-    ckpt: "lama/big-lama.ckpt"
-    config: "lama/config.yaml"
 
   PATH:
+    Inpainter: 
+      LAMA: "lama/big-lama.pt"
     TextDetection:
       EAST: "frozen_east_text_detection.pb"
       DB50: "DB_TD500_resnet50.onnx"
