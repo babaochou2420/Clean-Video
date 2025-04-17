@@ -1,3 +1,4 @@
+from daos.TextDetector import TextDetector
 from utils.logger import log_function, setup_logger
 import numpy as np
 import cv2
@@ -10,7 +11,7 @@ class MaskHelper:
   logger = setup_logger('MaskHelper')
 
   def __init__(self):
-    pass
+    self.textDetector = TextDetector()
 
   @log_function(logger)
   def maskOverlay(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -19,21 +20,6 @@ class MaskHelper:
     red_mask[:, :, 2] = mask  # Red channel
     vis = cv2.addWeighted(image, 0.7, red_mask, 0.3, 0)
     return vis
-
-  # @log_function(logger)
-  # def maskSubtitle(self, image: np.ndarray) -> np.ndarray:
-  #   """Detects text in the image and returns a binary mask of detected text regions."""
-  #   reader = easyocr.Reader(['en'], gpu=True)
-  #   results = reader.readtext(image)
-  #   mask = np.zeros(image.shape[:2], dtype=np.uint8)
-
-  #   for (bbox, text, confidence) in results:
-  #     pts = np.array(bbox, dtype=np.int32)
-  #     cv2.fillPoly(mask, [pts], 255)
-
-  #   mask = self.addLineStructure(image, mask)
-
-  #   return mask
 
   def refine_bbox(self, image: np.ndarray, easyocr_results) -> list:
     """Refine bounding boxes to better match character shapes using contour detection."""
@@ -139,11 +125,12 @@ class MaskHelper:
   # Return the mask directly produced from BBoxes
   def maskSubtitleBBoxes(self, image: np.ndarray) -> np.ndarray:
     """Detects text in the image and returns a binary mask of detected text regions."""
-    reader = easyocr.Reader(['en'], gpu=True)
-    results = reader.readtext(image)
+
+    ocrResults = self.textDetector.detect(image)
+
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
 
-    for (bbox, text, confidence) in results:
+    for (bbox, text, confidence) in ocrResults:
       pts = np.array(bbox, dtype=np.int32)
       cv2.fillPoly(mask, [pts], 255)
 

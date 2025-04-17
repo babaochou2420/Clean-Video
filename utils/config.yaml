@@ -7,7 +7,8 @@ models:
 
   PATH:
     Inpainter: 
-      LAMA: "lama/big-lama.pt"
+      LAMA: "LAMA/big-lama.pt"
+      STTN: "STTN/sttn.pth"
     TextDetection:
       EAST: "frozen_east_text_detection.pb"
       DB50: "DB_TD500_resnet50.onnx"

@@ -325,18 +325,17 @@ class VideoInpainter:
 
     return result
 
-  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Generate a preview of the inpainting process by processing a random frame from the video.
-    Returns the original frame, generated mask, and processed result.
-
-    Args:
-        video_path (str): Path to the input video file
-        output_folder (str): Path to save the preview results
-
-    Returns:
-        tuple: (original_frame, mask, processed_frame) as numpy arrays
-    """
+  #
+  #
+  # [Args]
+  # i:str - Video path
+  # i:str - Model name
+  # i:bool - Enable FTransform
+  # i:int - Inpaint radius
+  # o:np.ndarray - Inpainted frame
+  # o:np.ndarray - Mask
+  #
+  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Tuple[np.ndarray, np.ndarray]:
 
     self.loadModel(model)
 
