@@ -12,6 +12,7 @@ import gradio as gr
 from PIL import Image
 import sys
 import subprocess
+from daos import VideoHelper
 from daos.MaskHelper import MaskHelper
 from utils.logger import setup_logger, log_function
 from tqdm import tqdm
@@ -119,34 +120,50 @@ class VideoInpainter:
 
     self.loadModel(model)
 
-    with tqdm(total=total_frames) as pbar:
-      while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-          self.logger.info("End of video reached")
-          break
+    if model != ModelEnum.STTN.value:
+      with tqdm(total=total_frames) as pbar:
+        while cap.isOpened():
+          ret, frame = cap.read()
+          if not ret:
+            self.logger.info("End of video reached")
+            break
 
-        inpainted, mask = self.processFrame(frame, model, enableFTransform)
-        if inpainted is None:
-          self.logger.error("Failed to process frame")
-          continue
+          inpainted, mask = self.processFrame(frame, model, enableFTransform)
+          if inpainted is None:
+            self.logger.error("Failed to process frame")
+            continue
 
-        out.write(inpainted)
-        pbar.update(1)
+          out.write(inpainted)
+          pbar.update(1)
 
-    pbar.close()
-    cap.release()
-    out.release()
+      pbar.close()
+      cap.release()
+      out.release()
+    else:
+      video_helper = VideoHelper()
+      video_helper.cutFrames(video_path, os.path.join("temp", "frames"))
+      self.sttn.predict(video_path, os.path.join(
+          "temp", "frames"), output_path)
 
     self.logger.info(f"Processing complete. Output saved to: {output_path}")
 
     return output_path
 
   def loadModel(self, model: str):
-    if model == ModelEnum.LAMA.value:
-      from daos.inpainter.LAMA import LAMA
+    match model:
+      case ModelEnum.LAMA.value:
+        from daos.inpainter.LAMA import LAMA
 
-      self.lama = LAMA(device="cuda")
+        self.lama = LAMA(device="cuda")
+
+      case ModelEnum.STTN.value:
+        from daos.inpainter.STTN import STTN
+
+        self.sttn = STTN(device="cuda")
+
+      case _:
+        logger.error(f"Unknown model selected: {model}")
+        return
 
   #
   # [LOGIC]
@@ -154,6 +171,7 @@ class VideoInpainter:
   # 2. Paste the inpainted region back to the frame
   # 3. Return the result
   #
+
   def fast_ft_inpaint(self,
                       frame, mask, radius=3, function=cv2.ft.LINEAR, algorithm=cv2.ft.ONE_STEP):
     # Step 1: Get bounding box of non-zero region

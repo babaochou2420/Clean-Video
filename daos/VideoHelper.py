@@ -4,12 +4,48 @@ import tempfile
 from typing import List, Dict
 import logging
 
+import cv2
+
 
 class VideoHelper:
   def __init__(self):
     self.audio_cache = {}
     self.temp_dir = tempfile.gettempdir()
     self.logger = logging.getLogger(__name__)
+
+  def cutFrames(self, videoPath: str, outputDir: str):
+    """
+    Extract frames from a video using OpenCV and save them to the output directory,
+    preserving the original FPS (implicitly by grabbing every frame).
+    """
+    if not os.path.exists(videoPath):
+      self.logger.error(f"Video file not found: {videoPath}")
+      raise FileNotFoundError(f"Video file not found: {videoPath}")
+
+    os.makedirs(outputDir, exist_ok=True)
+
+    cap = cv2.VideoCapture(videoPath)
+    if not cap.isOpened():
+      self.logger.error(f"Failed to open video: {videoPath}")
+      raise RuntimeError(f"Failed to open video: {videoPath}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    self.logger.info(f"Original FPS: {fps}, Total frames: {total_frames}")
+
+    frame_idx = 0
+    saved_frames = 0
+
+    while True:
+      ret, frame = cap.read()
+      if not ret:
+        break
+      cv2.imwrite(os.path.join(outputDir, f"{frame_idx:06d}.png"), frame)
+      frame_idx += 1
+      saved_frames += 1
+
+    cap.release()
+    self.logger.info(f"Extracted {saved_frames} frames to {outputDir}")
 
   def audioDetach(self, filepath: str) -> Dict[str, str]:
     """
