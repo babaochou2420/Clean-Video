@@ -6,6 +6,7 @@ class ModelEnum(enum.Enum):
   OPENCV = "[CPU] OpenCV"
   LAMA = "[GPU] LAMA"
   STTN = "[GPU] STTN"
+  SDXL = "[GPU] SDXL"
 
   # EASYOCR = "[GPU] EasyOCR"
   # DB50 = "[CPU] DB50"

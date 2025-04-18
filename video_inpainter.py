@@ -14,6 +14,7 @@ import sys
 import subprocess
 from daos import VideoHelper
 from daos.MaskHelper import MaskHelper
+from daos.inpainter import SDXL
 from utils.logger import setup_logger, log_function
 from tqdm import tqdm
 
@@ -67,6 +68,7 @@ class VideoInpainter:
   def processFrame(self, frame: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
     """Process a single frame with the specified model and parameters"""
     try:
+      self.logger.warning(f"Processing frame with model: {model}")
       match model:
         case ModelEnum.LAMA.value:
           mask = self.maskHelper.maskSubtitleBBoxes(frame)
@@ -86,7 +88,9 @@ class VideoInpainter:
           cv2.inpaint(frame, mask, inpaintRadius, cv2.INPAINT_NS)
 
           return result, mask
-
+        case ModelEnum.SDXL.value:
+          mask = self.maskHelper.maskSubtitle(frame)
+          return self.sdxl.process(frame, mask)
         case _:
           logger.error(f"Unknown model selected: {model}")
           return None
@@ -156,10 +160,15 @@ class VideoInpainter:
 
         self.lama = LAMA(device="cuda")
 
-      case ModelEnum.STTN.value:
-        from daos.inpainter.STTN import STTN
+      # case ModelEnum.STTN.value:
+      #   from daos.inpainter.STTN import STTN
 
-        self.sttn = STTN(device="cuda")
+      #   self.sttn = STTN(device="cuda")
+
+      case ModelEnum.SDXL.value:
+        from daos.inpainter.SDXL import SDXL
+
+        self.sdxl = SDXL(device="cuda")
 
       case _:
         logger.error(f"Unknown model selected: {model}")

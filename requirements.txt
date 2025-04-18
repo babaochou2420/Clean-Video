@@ -14,3 +14,6 @@ albumentations==2.0.5
 webdataset
 easydict
 
+# Models
+diffusers
+transformers
