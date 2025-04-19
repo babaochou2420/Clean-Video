@@ -68,12 +68,18 @@ class VideoInpainter:
   def processFrame(self, frame: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
     """Process a single frame with the specified model and parameters"""
     try:
-      self.logger.warning(f"Processing frame with model: {model}")
+      # self.logger.warning(f"Processing frame with model: {model}")
       match model:
         case ModelEnum.LAMA.value:
           mask = self.maskHelper.maskSubtitleBBoxes(frame)
+          mask = self.maskHelper.applyStructureGuidance(frame, mask)
 
-          return self.lama.__call__(frame, mask), mask
+          # Stage 1
+          frame = self.lama.__call__(frame, mask)
+          # Stage 2 -- To reduce outline remaining
+          frame = self.lama.__call__(frame, mask)
+
+          return frame, mask
         case ModelEnum.OPENCV.value:
           mask = self.maskHelper.maskSubtitle(frame)
 
@@ -89,7 +95,7 @@ class VideoInpainter:
 
           return result, mask
         case ModelEnum.SDXL.value:
-          mask = self.maskHelper.maskSubtitle(frame)
+          mask = self.maskHelper.maskSubtitleBBoxes(frame)
           return self.sdxl.process(frame, mask)
         case _:
           logger.error(f"Unknown model selected: {model}")
@@ -362,7 +368,7 @@ class VideoInpainter:
   # o:np.ndarray - Inpainted frame
   # o:np.ndarray - Mask
   #
-  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3, frameIndex: int = None) -> Tuple[np.ndarray, np.ndarray]:
 
     self.loadModel(model)
 
@@ -372,12 +378,14 @@ class VideoInpainter:
       raise RuntimeError("Could not open video file")
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    random_frame_idx = np.random.randint(0, total_frames)
+
+    frameIndex = frameIndex if frameIndex is not None else np.random.randint(
+        0, total_frames)
 
     self.logger.debug(
-        f"[RUN] genPreview | Working on frame {random_frame_idx}")
+        f"[RUN] genPreview | Working on frame {frameIndex}")
 
-    cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame_idx)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frameIndex)
     ret, frame = cap.read()
     cap.release()
 

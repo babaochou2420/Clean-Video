@@ -135,3 +135,13 @@ class MaskHelper:
       cv2.fillPoly(mask, [pts], 255)
 
     return mask
+
+  def applyStructureGuidance(self, frame: np.ndarray, mask: np.ndarray, kernelSize: int = 7) -> np.ndarray:
+    edges = cv2.Canny(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 100, 200)
+    boost_mask = cv2.dilate(edges, np.ones(
+        (kernelSize, kernelSize), np.uint8), iterations=1)
+    boost_mask = cv2.bitwise_and(boost_mask, mask)
+
+    cv2.imwrite("boost_mask.png", boost_mask)
+
+    return boost_mask
