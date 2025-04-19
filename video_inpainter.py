@@ -33,11 +33,6 @@ class MaskMode(Enum):
   WATERMARK = "Watermark"
 
 
-class InpaintMode(Enum):
-  STTN = "STTN"
-  LAMA = "LAMA"
-
-
 class VideoInpainter:
   def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
     self.device = device

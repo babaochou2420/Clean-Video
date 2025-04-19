@@ -3,6 +3,8 @@ import subprocess
 import tempfile
 from typing import List, Dict
 import logging
+from moviepy import VideoFileClip, AudioFileClip
+
 
 import cv2
 
@@ -47,109 +49,58 @@ class VideoHelper:
     cap.release()
     self.logger.info(f"Extracted {saved_frames} frames to {outputDir}")
 
-  def audioDetach(self, filepath: str) -> Dict[str, str]:
-    """
-    Extract audio tracks from video file and store them temporarily.
-    Returns a dictionary mapping track indices to temporary audio file paths.
-    """
-    if not os.path.exists(filepath):
-      self.logger.error(f"File not found: {filepath}")
-      return {}
+  def extract_all_audio_tracks_ffmpeg(self, videoPath: str, output_dir: str) -> list:
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Get audio track information
-    cmd = ['ffprobe', '-v', 'quiet', '-print_format',
-           'json', '-show_streams', filepath]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-      self.logger.error("Failed to get stream information")
-      return {}
-
-    # Parse streams to find audio tracks
-    import json
-    streams = json.loads(result.stdout)['streams']
-    audio_tracks = [s for s in streams if s['codec_type'] == 'audio']
-
-    if not audio_tracks:
-      self.logger.warning("No audio tracks found in the video")
-      return {}
-
-    # Extract each audio track
-    self.audio_cache = {}
-    for i, track in enumerate(audio_tracks):
-      temp_audio = os.path.join(self.temp_dir, f"temp_audio_{i}.m4a")
-      cmd = [
-          'ffmpeg', '-i', filepath,
-          '-map', f'0:{track["index"]}',
-          '-c:a', 'copy',
-          '-y', temp_audio
-      ]
-
-      result = subprocess.run(cmd, capture_output=True)
-      if result.returncode == 0:
-        self.audio_cache[str(i)] = temp_audio
-        self.logger.info(f"Extracted audio track {i} to {temp_audio}")
-      else:
-        self.logger.error(f"Failed to extract audio track {i}")
-
-    return self.audio_cache
-
-  def videoConstruct(self, frames_dir: str, output_path: str, fps: float) -> bool:
-    """
-    Construct video from frames and combine with cached audio tracks.
-    Returns True if successful, False otherwise.
-    """
-    if not self.audio_cache:
-      self.logger.warning("No audio tracks found in cache")
-      return False
-
-    # Create temporary video without audio
-    temp_video = os.path.join(self.temp_dir, "temp_video.mp4")
-    cmd = [
-        'ffmpeg', '-framerate', str(fps),
-        '-i', os.path.join(frames_dir, '%d.png'),
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-        '-y', temp_video
+    # First get number of audio tracks
+    cmd_probe = [
+        "ffprobe", "-v", "error", "-select_streams", "a",
+        "-show_entries", "stream=index", "-of", "csv=p=0",
+        videoPath
     ]
+    result = subprocess.run(
+        cmd_probe, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-    result = subprocess.run(cmd, capture_output=True)
-    if result.returncode != 0:
-      self.logger.error("Failed to create temporary video")
-      return False
+    output_files = []
 
-    # Combine video with audio tracks
-    cmd = ['ffmpeg', '-i', temp_video]
-    for track_path in self.audio_cache.values():
-      cmd.extend(['-i', track_path])
+    for idx in range(int(result.stdout)):
+      out_path = os.path.join(output_dir, f"audio_track_{idx}.mp3")
+      cmd_extract = [
+          "ffmpeg", "-y", "-i", videoPath, "-map", f"0:a:{idx}", "-c:a", "mp3", out_path
+      ]
+      subprocess.run(cmd_extract, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
+      output_files.append(out_path)
 
-    cmd.extend(['-c:v', 'copy'])
-    for i in range(len(self.audio_cache)):
-      cmd.extend(['-c:a:' + str(i), 'copy'])
+    return output_files
 
-    cmd.extend(['-y', output_path])
+  def reattach_audio_tracks_ffmpeg(self, videoPath: str, audio_tracks: list, output_path: str):
+    if not audio_tracks:
+      raise ValueError("No audio tracks provided.")
 
-    result = subprocess.run(cmd, capture_output=True)
-    if result.returncode != 0:
-      self.logger.error("Failed to combine video with audio")
-      return False
+    if len(audio_tracks) != 1:
+      self.logger.info("Processing with [multiple audio tracks]")
+    else:
+      self.logger.info("Processing with [single audio track]")
 
-    # Clean up temporary files
-    try:
-      os.remove(temp_video)
-      for audio_file in self.audio_cache.values():
-        os.remove(audio_file)
-      self.audio_cache.clear()
-    except Exception as e:
-      self.logger.warning(f"Failed to clean up temporary files: {e}")
+    cmd = ["ffmpeg", "-y", "-i", videoPath]
 
-    return True
+    # Add all audio inputs
+    for track in audio_tracks:
+      cmd.extend(["-i", track])
 
-  def __del__(self):
-    """Clean up any remaining temporary files when the object is destroyed"""
-    try:
-      for audio_file in self.audio_cache.values():
-        if os.path.exists(audio_file):
-          os.remove(audio_file)
-    except Exception as e:
-      self.logger.warning(
-          f"Failed to clean up temporary files in destructor: {e}")
+    # Map the video stream
+    cmd.append("-map")
+    cmd.append("0:v:0")
+
+    # Map each audio stream
+    for i in range(1, len(audio_tracks) + 1):
+      cmd.extend(["-map", f"{i}:a:0"])
+
+    # Copy codecs directly without re-encoding
+    cmd.extend(["-c:v", "copy", "-c:a", "aac"])
+
+    # Output file
+    cmd.append(output_path)
+
+    subprocess.run(cmd, check=True)

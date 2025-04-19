@@ -17,3 +17,6 @@ easydict
 # Models
 diffusers
 transformers
+
+# Video Processing
+moviepy==2.1.2
