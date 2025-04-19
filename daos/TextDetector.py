@@ -7,7 +7,7 @@ logger = setup_logger('text_detector')
 
 
 class TextDetector:
-  def __init__(self, lang_list=None):
+  def __init__(self, lang_list=None, model: str = "easyocr"):
     logger.info("Initializing TextDetector")
     self.reader = (easyocr.Reader(lang_list or ['en'], gpu=True), "easyocr")
 

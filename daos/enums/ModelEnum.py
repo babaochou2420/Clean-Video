@@ -25,3 +25,12 @@ class OpenCVFTEnum(enum.Enum):
   @classmethod
   def values(cls):
     return [item.value for item in cls]
+
+
+class OCRModelEnum(enum.Enum):
+  easyocr = "Easy-OCR"
+  paddleocr = "PaddleOCR"
+
+  @classmethod
+  def values(cls):
+    return [item.value for item in cls]

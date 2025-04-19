@@ -4,7 +4,10 @@ gradio==5.24.0
 opencv-contrib-python==4.11.0.86
 numpy==1.26.4
 pytesseract==0.3.13
+
+# OCR
 easyocr==1.7.2
+paddleocr==2.10.0
 
 omegaconf==2.3.0
 

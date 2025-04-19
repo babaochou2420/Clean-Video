@@ -1,3 +1,4 @@
+import time
 from daos.TextDetector import TextDetector
 from utils.logger import log_function, setup_logger
 import numpy as np
@@ -136,10 +137,16 @@ class MaskHelper:
 
     return mask
 
-  def applyStructureGuidance(self, frame: np.ndarray, mask: np.ndarray, kernelSize: int = 7) -> np.ndarray:
+  def applyStructureGuidance(self, frame: np.ndarray, mask: np.ndarray, ksize: int = 7) -> np.ndarray:
+    # start = time.time()
     edges = cv2.Canny(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 100, 200)
+    # print(f"Canny time: {time.time() - start}")
+    # start = time.time()
+    # edges = cv2.Laplacian(cv2.cvtColor(
+    #     frame, cv2.COLOR_BGR2GRAY), cv2.CV_8U, ksize=3)
+    # print(f"Laplacian time: {time.time() - start}")
     boost_mask = cv2.dilate(edges, np.ones(
-        (kernelSize, kernelSize), np.uint8), iterations=1)
+        (ksize, ksize), np.uint8), iterations=1)
     boost_mask = cv2.bitwise_and(boost_mask, mask)
 
     cv2.imwrite("boost_mask.png", boost_mask)
