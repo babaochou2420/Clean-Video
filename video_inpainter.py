@@ -7,7 +7,6 @@ import cv2
 from einops import rearrange
 import os
 from typing import List, Tuple, Optional, Union
-import gdown
 import gradio as gr
 from PIL import Image
 import sys

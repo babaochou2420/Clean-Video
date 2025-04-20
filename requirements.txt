@@ -8,6 +8,7 @@ pytesseract==0.3.13
 # OCR
 easyocr==1.7.2
 paddleocr==2.10.0
+paddlepaddle==3.0.0
 
 omegaconf==2.3.0
 
@@ -20,6 +21,9 @@ easydict
 # Models
 diffusers
 transformers
+
+einops
+matplotlib==3.10.1
 
 # Video Processing
 moviepy==2.1.2

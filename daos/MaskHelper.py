@@ -12,7 +12,7 @@ class MaskHelper:
   logger = setup_logger('MaskHelper')
 
   def __init__(self):
-    self.textDetector = TextDetector()
+    self.textDetector = TextDetector(model="easyocr")
 
   @log_function(logger)
   def maskOverlay(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -127,11 +127,11 @@ class MaskHelper:
   def maskSubtitleBBoxes(self, image: np.ndarray) -> np.ndarray:
     """Detects text in the image and returns a binary mask of detected text regions."""
 
-    ocrResults = self.textDetector.detect(image)
+    bboxes = self.textDetector.detect(image)
 
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
 
-    for (bbox, text, confidence) in ocrResults:
+    for (bbox) in bboxes:
       pts = np.array(bbox, dtype=np.int32)
       cv2.fillPoly(mask, [pts], 255)
 
