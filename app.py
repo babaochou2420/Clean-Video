@@ -30,7 +30,7 @@ def create_app():
 
     HomeTab().__load__()
 
-    SettingsTab.__load__()
+    SettingsTab().__load__()
     # about_tab = create_about_tab()
     # logger.info("Interface created successfully")
 

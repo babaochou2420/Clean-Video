@@ -11,7 +11,7 @@ import gradio as gr
 from PIL import Image
 import sys
 import subprocess
-from daos import VideoHelper
+from daos.VideoHelper import VideoHelper
 from daos.MaskHelper import MaskHelper
 from daos.inpainter import SDXL
 from utils.logger import setup_logger, log_function
@@ -42,6 +42,7 @@ class VideoInpainter:
     self.config = Config.get_config()
 
     self.maskHelper = MaskHelper()
+    self.videoHelper = VideoHelper()
 
   @log_function(logger)
   def create_mask(self, frame: np.ndarray, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
@@ -143,6 +144,15 @@ class VideoInpainter:
       pbar.close()
       cap.release()
       out.release()
+
+      # Attaching audio tracks from the original
+
+      tracks = self.videoHelper.extractAudioTracks(
+          video_path, "temp/audio")
+
+      self.videoHelper.attachAudioTracks(
+          output_path, tracks, "output_audio.mp4")
+
     else:
       video_helper = VideoHelper()
       video_helper.cutFrames(video_path, os.path.join("temp", "frames"))

@@ -52,7 +52,7 @@ class VideoHelper:
     cap.release()
     self.logger.info(f"Extracted {saved_frames} frames to {outputDir}")
 
-  def audioTracksExtract(self, videoPath: str, output_dir: str) -> list:
+  def extractAudioTracks(self, videoPath: str, output_dir: str) -> list:
     os.makedirs(output_dir, exist_ok=True)
 
     # First get number of audio tracks
@@ -77,7 +77,7 @@ class VideoHelper:
 
     return output_files
 
-  def audioTracksReattach(self, videoPath: str, audio_tracks: list, output_path: str):
+  def attachAudioTracks(self, videoPath: str, audio_tracks: list, output_path: str):
     if not audio_tracks:
       raise ValueError("No audio tracks provided.")
 
