@@ -1,5 +1,4 @@
 import gradio as gr
-from video_inpainter import InpaintMode
 
 
 class SettingsTab:

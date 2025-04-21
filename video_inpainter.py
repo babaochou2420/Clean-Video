@@ -362,29 +362,9 @@ class VideoInpainter:
   # o:np.ndarray - Inpainted frame
   # o:np.ndarray - Mask
   #
-  def genPreview(self, video_path: str, model: str, enableFTransform: bool = False, inpaintRadius: int = 3, frameIndex: int = None) -> Tuple[np.ndarray, np.ndarray]:
+  def genPreview(self, frame: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Tuple[np.ndarray, np.ndarray]:
 
     self.loadModel(model)
-
-    # Open video and get random frame
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-      raise RuntimeError("Could not open video file")
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    frameIndex = frameIndex if frameIndex is not None else np.random.randint(
-        0, total_frames)
-
-    self.logger.debug(
-        f"[RUN] genPreview | Working on frame {frameIndex}")
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frameIndex)
-    ret, frame = cap.read()
-    cap.release()
-
-    if not ret:
-      raise RuntimeError("Could not read frame from video")
 
     # Generate mask and process the frame
     preview, mask = self.processFrame(

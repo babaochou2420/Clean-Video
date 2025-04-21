@@ -6,6 +6,7 @@ import cv2
 import easyocr
 import os
 import matplotlib.pyplot as plt
+from daos.ImageHelper import ImageHelper
 
 
 class MaskHelper:
@@ -13,6 +14,7 @@ class MaskHelper:
 
   def __init__(self):
     self.textDetector = TextDetector(model="easyocr")
+    self.imageHelper = ImageHelper()
 
   @log_function(logger)
   def maskOverlay(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -127,7 +129,10 @@ class MaskHelper:
   def maskSubtitleBBoxes(self, image: np.ndarray) -> np.ndarray:
     """Detects text in the image and returns a binary mask of detected text regions."""
 
-    bboxes = self.textDetector.detect(image)
+    bboxes = self.textDetector.detect(
+        self.imageHelper.applyCLAHE(image, mode='gray'))
+
+    # bboxes = self.textDetector.detect(image)
 
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
 
@@ -139,6 +144,10 @@ class MaskHelper:
 
   def applyStructureGuidance(self, frame: np.ndarray, mask: np.ndarray, ksize: int = 7) -> np.ndarray:
     # start = time.time()
+
+    # Apply CLAHE to the frame
+    frame = self.imageHelper.applyCLAHE(frame, mode='color')
+
     edges = cv2.Canny(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 100, 200)
     # print(f"Canny time: {time.time() - start}")
     # start = time.time()

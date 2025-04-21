@@ -27,7 +27,9 @@ def create_app():
   with gr.Blocks() as demo:
       # Create tabs
     logger.debug("Creating tabs")
-    HomeTab.__load__()
+
+    HomeTab().__load__()
+
     SettingsTab.__load__()
     # about_tab = create_about_tab()
     # logger.info("Interface created successfully")

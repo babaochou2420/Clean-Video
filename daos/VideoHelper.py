@@ -1,9 +1,12 @@
+import datetime
 import os
+import random
 import subprocess
 import tempfile
 from typing import List, Dict
 import logging
 from moviepy import VideoFileClip, AudioFileClip
+import numpy as np
 
 
 import cv2
@@ -104,3 +107,24 @@ class VideoHelper:
     cmd.append(output_path)
 
     subprocess.run(cmd, check=True)
+
+  def convertFrame2Time(self, frameIndex: int, fps: int) -> str:
+    # Return in HH:MM:SS format
+    return str(datetime.timedelta(seconds=(frameIndex / fps))).split('.')[0]
+
+  # Get a specific frame from the input video
+  #
+  # @param videoPath: str - The path to the video file
+  # @param frameIndex: int - The index of the frame to get
+  def getFrame(self, videoPath: str, frameIndex: int = None):
+
+    # Open video and get random frame
+    cap = cv2.VideoCapture(videoPath)
+    if not cap.isOpened():
+      raise RuntimeError("Could not open video file")
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frameIndex)
+    ret, frame = cap.read()
+
+    cap.release()
+    return frame
