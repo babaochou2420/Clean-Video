@@ -44,7 +44,7 @@ class VideoInpainter:
     self.maskHelper = MaskHelper()
     self.videoHelper = VideoHelper()
 
-  @log_function(logger)
+  # @log_function(logger)
   def create_mask(self, frame: np.ndarray, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
     """Create a mask depending on the selected mode"""
     self.logger.debug(f"Creating mask with mode: {mask_mode}")
@@ -59,7 +59,7 @@ class VideoInpainter:
 
       return np.zeros(frame.shape[:2], dtype=np.uint8)
 
-  @log_function(logger)
+  # @log_function(logger)
   def processFrame(self, frame: np.ndarray, model: str, enableFTransform: bool = False, inpaintRadius: int = 3) -> Optional[np.ndarray]:
     """Process a single frame with the specified model and parameters"""
     try:
@@ -74,9 +74,10 @@ class VideoInpainter:
           # # Stage 2 -- To reduce outline remaining
           # frame = self.lama.__call__(frame, mask)
 
-          return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), mask
+          return frame, mask
         case ModelEnum.OPENCV.value:
-          mask = self.maskHelper.maskSubtitle(frame)
+          mask = self.maskHelper.maskSubtitleBBoxes(frame)
+          mask = self.maskHelper.applyStructureGuidance(frame, mask)
 
           if enableFTransform:
             result = self.fast_ft_inpaint(
@@ -169,6 +170,9 @@ class VideoInpainter:
         from daos.inpainter.LAMA import LAMA
 
         self.lama = LAMA(device="cuda")
+
+      case ModelEnum.OPENCV.value:
+        pass
 
       # case ModelEnum.STTN.value:
       #   from daos.inpainter.STTN import STTN

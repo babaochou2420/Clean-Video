@@ -119,8 +119,7 @@ class MaskHelper:
     """Detects text in the image and returns a binary mask of detected text regions."""
 
     bboxes = self.textDetector.detect(
-        self.imageHelper.applyCLAHE(image, mode='gray'))
-
+        self.imageHelper.applyCLAHE(image, mode='color'))
     # bboxes = self.textDetector.detect(image)
 
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
@@ -134,7 +133,7 @@ class MaskHelper:
   def applyStructureGuidance(self, frame: np.ndarray, mask: np.ndarray, ksize: int = 7) -> np.ndarray:
     # start = time.time()
 
-    # Apply CLAHE to the frame
+    # To make edges more visible
     frame = self.imageHelper.applyCLAHE(frame, mode='color')
 
     edges = cv2.Canny(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 100, 200)
