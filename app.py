@@ -21,7 +21,7 @@ from typing import Optional, Tuple, Union
 logger = setup_logger('app')
 
 
-@log_function(logger)
+# @log_function(logger)
 def create_app():
   # logger.info("Creating Gradio interface")
   with gr.Blocks() as demo:

@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import random
 import subprocess
@@ -12,7 +13,7 @@ import numpy as np
 import cv2
 
 
-class VideoHelper:
+class MediaHelper:
   def __init__(self):
     self.audio_cache = {}
     self.temp_dir = tempfile.gettempdir()
@@ -52,10 +53,18 @@ class VideoHelper:
     cap.release()
     self.logger.info(f"Extracted {saved_frames} frames to {outputDir}")
 
-  def extractAudioTracks(self, videoPath: str, output_dir: str) -> list:
-    os.makedirs(output_dir, exist_ok=True)
+  def getMetadata(self, videoPath: str):
+    cmd = [
+        "ffprobe", "-v", "error", "-print_format", "json",
+        "-show_format", "-show_streams", videoPath
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+    return json.loads(result.stdout)
 
-    # First get number of audio tracks
+  # Using FFmpeg to get the number of audio tracks in the file
+
+  def countAudioTracks(self, videoPath: str) -> int:
     cmd_probe = [
         "ffprobe", "-v", "error", "-select_streams", "a",
         "-show_entries", "stream=index", "-of", "csv=p=0",
@@ -64,9 +73,17 @@ class VideoHelper:
     result = subprocess.run(
         cmd_probe, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
+    return int(result.stdout)
+
+  def extractAudioTracks(self, videoPath: str, output_dir: str) -> list:
+    os.makedirs(output_dir, exist_ok=True)
+
+    # First get number of audio tracks
+    cntAudioTracks = self.countAudioTracks(videoPath)
+
     output_files = []
 
-    for idx in range(int(result.stdout)):
+    for idx in range(cntAudioTracks):
       out_path = os.path.join(output_dir, f"audio_track_{idx}.mp3")
       cmd_extract = [
           "ffmpeg", "-y", "-i", videoPath, "-map", f"0:a:{idx}", "-c:a", "mp3", out_path

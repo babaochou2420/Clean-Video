@@ -94,7 +94,7 @@ class MaskHelper:
 
     return refined_boxes
 
-  @log_function(logger)
+  # @log_function(logger)
   def maskSubtitle(self, image: np.ndarray) -> np.ndarray:
     """Detects text in the image and returns a binary mask of detected text regions."""
     reader = easyocr.Reader(['en'], gpu=True)

@@ -1,5 +1,6 @@
 from enum import Enum
 from multiprocessing import Pool
+import time
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -11,7 +12,7 @@ import gradio as gr
 from PIL import Image
 import sys
 import subprocess
-from daos.VideoHelper import VideoHelper
+from daos.MediaHelper import MediaHelper
 from daos.MaskHelper import MaskHelper
 from daos.inpainter import SDXL
 from utils.logger import setup_logger, log_function
@@ -42,7 +43,7 @@ class VideoInpainter:
     self.config = Config.get_config()
 
     self.maskHelper = MaskHelper()
-    self.videoHelper = VideoHelper()
+    self.videoHelper = MediaHelper()
 
   # @log_function(logger)
   def create_mask(self, frame: np.ndarray, mask_mode: MaskMode = MaskMode.TEXT) -> np.ndarray:
@@ -100,11 +101,13 @@ class VideoInpainter:
       self.logger.error(f"Error processing frame: {e}")
       return None
 
-  @log_function(logger)
+  # @log_function(logger)
   def process_video(self, video_path: str, output_path: str, model: str, enableFTransform: bool = False, mask_mode: MaskMode = MaskMode.TEXT) -> Optional[str]:
     """Process the video and apply inpainting on detected text regions"""
     self.logger.info(
         f"Start video processing with [{model}] on mask mode: {mask_mode}")
+
+    timeStart = time.time()
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -155,12 +158,15 @@ class VideoInpainter:
           output_path, tracks, "output_audio.mp4")
 
     else:
-      video_helper = VideoHelper()
+      video_helper = MediaHelper()
       video_helper.cutFrames(video_path, os.path.join("temp", "frames"))
       self.sttn.predict(video_path, os.path.join(
           "temp", "frames"), output_path)
 
+    timeTaken = time.time() - timeStart
+
     self.logger.info(f"Processing complete. Output saved to: {output_path}")
+    self.logger.info(f"Time taken: {timeTaken} seconds")
 
     return output_path
 

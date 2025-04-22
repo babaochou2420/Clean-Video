@@ -13,11 +13,11 @@ saveDir = f"tests/sample/{modelName}"
 os.makedirs(saveDir, exist_ok=True)
 
 testers = [
-    # "tests/frames/test1_500.png",
-    # "tests/frames/test1_190.png",
+    "tests/frames/test1_500.png",
+    "tests/frames/test1_190.png",
     "tests/frames/test1_191.png",
-    # "tests/frames/test1_192.png",
-    #    "tests/frames/test2_210.png"
+    "tests/frames/test1_192.png",
+    "tests/frames/test2_210.png"
 ]
 
 videoInpainter = VideoInpainter()

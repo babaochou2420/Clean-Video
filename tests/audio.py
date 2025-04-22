@@ -1,8 +1,8 @@
 
-from daos.VideoHelper import VideoHelper
+from daos.MediaHelper import MediaHelper
 
 
-videoHelper = VideoHelper()
+videoHelper = MediaHelper()
 
 tracks = videoHelper.extractAudioTracks("test.mp4", "tests/audio")
 
