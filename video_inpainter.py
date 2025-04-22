@@ -71,10 +71,10 @@ class VideoInpainter:
 
           # Stage 1
           frame = self.lama.__call__(frame, mask)
-          # Stage 2 -- To reduce outline remaining
-          frame = self.lama.__call__(frame, mask)
+          # # Stage 2 -- To reduce outline remaining
+          # frame = self.lama.__call__(frame, mask)
 
-          return frame, mask
+          return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), mask
         case ModelEnum.OPENCV.value:
           mask = self.maskHelper.maskSubtitle(frame)
 

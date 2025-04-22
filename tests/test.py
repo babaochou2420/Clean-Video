@@ -3,7 +3,7 @@ from video_inpainter import VideoInpainter
 
 
 VideoInpainter().genPreview(cv2.imread(
-    "test.png"), "[GPU] LAMA")
+    "test_360.png"), "[GPU] LAMA")
 
 # VideoInpainter().genPreview(cv2.imread(
 #     "test.png"), "[GPU] LAMA")
