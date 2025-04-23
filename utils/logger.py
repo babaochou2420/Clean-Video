@@ -7,24 +7,32 @@ from datetime import datetime
 os.makedirs("logs", exist_ok=True)
 
 
-def setup_logger(name):
-  """Setup a logger with file and console handlers"""
+def setup_logger(name: str) -> logging.Logger:
+  """Setup a logger with code line info and both file & console output."""
   logger = logging.getLogger(name)
   logger.setLevel(logging.INFO)
 
-  # Create handlers
+  if logger.hasHandlers():
+    return logger  # Prevent duplicate handlers on re-import
+
+  # Create log directory if it doesn't exist
+  os.makedirs("logs", exist_ok=True)
+
   log_file = os.path.join(
       "logs", f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+  # Handlers
   file_handler = logging.FileHandler(log_file)
   console_handler = logging.StreamHandler()
 
-  # Create formatters and add it to handlers
+  # Formatter with filename and line number
   formatter = logging.Formatter(
-      '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+      "[%(asctime)s] [%(levelname)5s] %(filename)s:%(lineno)d - %(message)s"
+  )
   file_handler.setFormatter(formatter)
   console_handler.setFormatter(formatter)
 
-  # Add handlers to the logger
+  # Attach handlers
   logger.addHandler(file_handler)
   logger.addHandler(console_handler)
 
