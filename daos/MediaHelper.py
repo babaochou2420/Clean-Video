@@ -53,6 +53,9 @@ class MediaHelper:
     cap.release()
     self.logger.info(f"Extracted {saved_frames} frames to {outputDir}")
 
+  def clrMetadata(self):
+    return None
+
   def getMetadata(self, videoPath: str):
     cmd = [
         "ffprobe", "-v", "error", "-print_format", "json",

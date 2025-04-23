@@ -34,3 +34,11 @@ class OCRModelEnum(enum.Enum):
   @classmethod
   def values(cls):
     return [item.value for item in cls]
+
+
+class IconEnum(enum.Enum):
+  RANDOM = "assets/icons/casino_24dp.png"
+
+  @classmethod
+  def values(cls):
+    return [item.value for item in cls]

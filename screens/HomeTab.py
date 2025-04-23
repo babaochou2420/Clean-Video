@@ -1,12 +1,14 @@
 import datetime
+import fractions
 import logging
+import time
 import gradio as gr
 from daos.MediaHelper import MediaHelper
 from utils.config import Config
 from utils.logger import setup_logger
 from video_inpainter import VideoInpainter
 import cv2
-from daos.enums.ModelEnum import ModelEnum, OpenCVFTEnum
+from daos.enums.ModelEnum import IconEnum, ModelEnum, OpenCVFTEnum
 import numpy as np
 
 
@@ -15,6 +17,7 @@ class HomeTab:
   def __init__(self):
     self.videoHelper = MediaHelper()
     self.config = Config.get_config()
+    self.mediaHelper = MediaHelper()
 
   def __load__(self):
 
@@ -38,7 +41,7 @@ class HomeTab:
         # Input Infomation
         with gr.Row(equal_height=True):
           with gr.Column(scale=4):
-            input_video = gr.Video(label="Input Video")
+            inputVideo = gr.Video(label="Input Video")
 
           # Inpaint Result Preview
           with gr.Column(scale=6):
@@ -66,33 +69,23 @@ class HomeTab:
                   # def calFramesTotal(fps, duration):
                   #   return fps*duration
 
-                  def update_video_info(video_path):
-                    if not video_path:
+                  # JSON
+                  def extractVideoMetadata(metadata):
+                    # Init
+                    if metadata is None:
                       return None, None, None, None
-                    cap = cv2.VideoCapture(video_path)
+                    # Extract
+                    else:
+                      return f"{metadata['streams'][0]['width']}x{metadata['streams'][0]['height']}", metadata['streams'][0]['nb_frames'], str(datetime.timedelta(seconds=int(float(metadata['streams'][0]['duration'])))), float(fractions.Fraction(metadata['streams'][0]['r_frame_rate']))
 
-                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    fps = cap.get(cv2.CAP_PROP_FPS)
-                    duration = total_frames // fps
-                    durationFormatted = datetime.timedelta(seconds=duration)
-                    cap.release()
+          inputVideo.upload(fn=self.mediaHelper.getMetadata, inputs=[
+                            inputVideo], outputs=[stateVideoMetadata])
 
-                    metadata = self.videoHelper.getMetadata(video_path)
+          inputVideo.clear(fn=self.mediaHelper.clrMetadata,
+                           outputs=[stateVideoMetadata])
 
-                    return metadata, durationFormatted, f"{metadata['streams'][0]['width']}x{metadata['streams'][0]['height']}", fps, duration, total_frames, fps, metadata["streams"][0]["nb_frames"]
-
-                  input_video.change(
-                      fn=update_video_info,
-                      inputs=[input_video],
-                      outputs=[stateVideoMetadata, infoVideoDuration, infoVideoResolution,
-                               infoFPS, stateVideoDuration, stateVideoFrameTotal, stateVideoFPS, infoTotalFrames
-                               ]
-                  )
-
-          def initVideoInfo():
-            return None, None, None, None, None, None, None, None
-
-          # input_video.clear()
+          stateVideoMetadata.change(
+              fn=extractVideoMetadata, inputs=[stateVideoMetadata], outputs=[infoVideoResolution, infoTotalFrames, infoVideoDuration, infoFPS])
 
         # Preview and Inpaint Settings
         with gr.Row(equal_height=True):
@@ -112,7 +105,8 @@ class HomeTab:
             with gr.Row():
               # Preview Frame Control
               with gr.Column(scale=1):
-                getPreviewFrame = gr.Button("Find Random Frame")
+                getPreviewFrame = gr.Button(
+                    value="Find Random Frame", icon=IconEnum.RANDOM.value)
 
                 nowFrameIndex = gr.Number(
                     label="Current Frame Index")
@@ -124,7 +118,7 @@ class HomeTab:
                   return frame, [(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), "Frame for Preview Generation")], self.videoHelper.convertFrame2Time(frameIndex, fps)
 
                 nowFrameIndex.change(fn=showPreviewFrame, inputs=[
-                    input_video, nowFrameIndex, stateVideoFPS], outputs=[stateVideoFrame4Preview, preview_gallery, nowFrameTime])
+                    inputVideo, nowFrameIndex, stateVideoFPS], outputs=[stateVideoFrame4Preview, preview_gallery, nowFrameTime])
 
                 def getRandomFrameIndex(frameTotal: int = 0):
                   if frameTotal == 0:
@@ -231,7 +225,7 @@ class HomeTab:
 
       process_btn.click(
           fn=process_video,
-          inputs=[input_video, modelPicker, switchFTransform],
+          inputs=[inputVideo, modelPicker, switchFTransform],
           outputs=output_video
       )
 
