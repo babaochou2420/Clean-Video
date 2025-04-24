@@ -76,7 +76,7 @@ class HomeTab:
                       return None, None, None, None
                     # Extract
                     else:
-                      return f"{metadata['streams'][0]['width']}x{metadata['streams'][0]['height']}", metadata['streams'][0]['nb_frames'], str(datetime.timedelta(seconds=int(float(metadata['streams'][0]['duration'])))), float(fractions.Fraction(metadata['streams'][0]['r_frame_rate']))
+                      return f"{metadata['streams'][0]['width']}x{metadata['streams'][0]['height']}", metadata['streams'][0]['nb_frames'], str(datetime.timedelta(seconds=int(float(metadata['streams'][0]['duration'])))), float(fractions.Fraction(metadata['streams'][0]['r_frame_rate'])), float(fractions.Fraction(metadata['streams'][0]['r_frame_rate'])), float(fractions.Fraction(metadata['streams'][0]['r_frame_rate']))
 
           inputVideo.upload(fn=self.mediaHelper.getMetadata, inputs=[
                             inputVideo], outputs=[stateVideoMetadata])
@@ -85,7 +85,7 @@ class HomeTab:
                            outputs=[stateVideoMetadata])
 
           stateVideoMetadata.change(
-              fn=extractVideoMetadata, inputs=[stateVideoMetadata], outputs=[infoVideoResolution, infoTotalFrames, infoVideoDuration, infoFPS])
+              fn=extractVideoMetadata, inputs=[stateVideoMetadata], outputs=[infoVideoResolution, infoTotalFrames, infoVideoDuration, infoFPS, stateVideoFPS])
 
         # Preview and Inpaint Settings
         with gr.Row(equal_height=True):

@@ -1,0 +1,1 @@
+ffmpeg -ss 00:00:02 -i ./output_audio.mp4 -frames:v 1 "screenshot_inputseeking.png"

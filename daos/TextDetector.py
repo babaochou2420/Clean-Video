@@ -37,6 +37,7 @@ class TextDetector:
         results = self.reader[0].readtext(image)
 
         # logger.info(results)
+        logger.info(results)
 
         bboxes = [item[0] for item in results]
       case "paddle":
@@ -46,4 +47,5 @@ class TextDetector:
         bboxes = results
       case _:
         raise ValueError(f"Unsupported reader: {self.reader[1]}")
+
     return bboxes
