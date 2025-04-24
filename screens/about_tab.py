@@ -14,7 +14,6 @@ def create_about_tab():
         - Customizable processing settings
         
         ## Technology
-        - ProPainter: State-of-the-art video inpainting
         - PyTorch: Deep learning framework
         - Gradio: Web interface
         

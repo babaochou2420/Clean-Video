@@ -1,0 +1,24 @@
+# config.yaml
+
+models:
+  BASE: 
+    TextDetection: "models/TextDetection"
+    Inpainter: "models/Inpainter"
+
+  PATH:
+    Inpainter: 
+      LAMA: "LAMA/big-lama.pt"
+      STTN: "STTN/sttn.pth"
+    TextDetection:
+      EAST: "frozen_east_text_detection.pb"
+      DB50: "DB_TD500_resnet50.onnx"
+
+
+settings:
+  FORMAT:
+    SAME: true
+    VIDEO: "mp4"
+    AUDIO: "mp3"
+
+
+

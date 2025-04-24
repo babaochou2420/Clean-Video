@@ -2,7 +2,7 @@ import unittest
 import os
 import cv2
 import numpy as np
-from daos.text_detector import TextDetector
+from daos.TextDetector import TextDetector
 
 
 class TestTextDetector(unittest.TestCase):

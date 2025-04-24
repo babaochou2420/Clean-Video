@@ -1,5 +1,29 @@
-gradio==5.25.0
-opencv-python==4.11.0.86
+# gradio==5.25.0
+# Using old version because hot-reload not working properly
+gradio==5.24.0
+opencv-contrib-python==4.11.0.86
 numpy==1.26.4
 pytesseract==0.3.13
+
+# OCR
 easyocr==1.7.2
+paddleocr==2.10.0
+paddlepaddle==3.0.0
+
+omegaconf==2.3.0
+
+# LAMA
+pytorch-lightning
+albumentations==2.0.5
+webdataset
+easydict
+
+# Models
+diffusers
+transformers
+
+einops
+matplotlib==3.10.1
+
+# Video Processing
+moviepy==2.1.2
